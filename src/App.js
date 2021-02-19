@@ -1,11 +1,13 @@
-import { useReducer } from 'react';
-// import { useEffect, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import API_CALENDAR from './components/ApiCalendar';
 
+const NOW = moment().format("yyyy-MM-DD");
+// console.log(NOW);
 const localizer = momentLocalizer(moment);
+
 
 const eventsReducer = (state, action) => {
     switch (action.type) {
@@ -46,12 +48,21 @@ const eventsReducer = (state, action) => {
 const App = () => {
     const api = API_CALENDAR;
 
-    // const [modalEvent, setModalEvent] = useState({ summary: 'Título', start: new Date(), end: new Date() });
+    const [userName, setUserName] = useState(undefined);
 
     const [events, dispatchEvents] = useReducer(
         eventsReducer,
         { data: [], modalEvent: {}, isLoading: false, isError: false, isLoged: false, modalIsVisible: false }
     );
+
+    useEffect(() => {
+        if (events.isLoged) {
+            let profile = api.getBasicUserProfile();
+            setUserName(profile.getName());
+        } else {
+            setUserName(undefined);
+        }
+    }, [events.isLoged]);
 
     const handleLogin = async () => {
         dispatchEvents({ type: 'WAIT' });
@@ -79,32 +90,35 @@ const App = () => {
 
     const handleEventSelection = (event = undefined) => {
 
-        // console.log('handleEventSelection - PRE-DISPATCH ');
-        // console.log('EVENT');
-        // console.log(event);
-        // console.log('MODAL EVENT');
-        // console.log(events.modalEvent);
-        // console.log('MODAL');
-        // console.log(events.modalIsVisible);
+        // <>
+        // {/* // console.log('handleEventSelection - PRE-DISPATCH ');
+        // // console.log('EVENT');
+        // // console.log(event);
+        // // console.log('MODAL EVENT');
+        // // console.log(events.modalEvent);
+        // // console.log('MODAL');
+        // // console.log(events.modalIsVisible);
 
-        dispatchEvents({ type: 'SINGLE_EVENT_MANAGEMENT', payload: event });
 
-        // console.log('handleEventSelection - POST-DISPATCH ');
-        // console.log('EVENT');
-        // console.log(event);
-        // console.log('MODAL EVENT');
-        // console.log(events.modalEvent);
-        // console.log('MODAL');
-        // console.log(events.modalIsVisible);
+        // // console.log('handleEventSelection - POST-DISPATCH ');
+        // // console.log('EVENT');
+        // // console.log(event);
+        // // console.log('MODAL EVENT');
+        // // console.log(events.modalEvent);
+        // // console.log('MODAL');
+        // // console.log(events.modalIsVisible); */}
+        // </>
 
         try {
             if (event) {
                 // alert('SINGLE_EVENT_MANAGEMENT');
                 // alert('UPDATE_EVENT');
+                dispatchEvents({ type: 'SINGLE_EVENT_MANAGEMENT', payload: event });
                 // dispatchEvents({ type: 'UPDATE_EVENT', payload: event });
             } else {
                 // alert('SINGLE_EVENT_MANAGEMENT');
                 // alert('CREATE_EVENT');
+                dispatchEvents({ type: 'SINGLE_EVENT_MANAGEMENT', payload: { summary: 'Título', start: new Date().toString(), end: new Date().toString() } });
 
                 dispatchEvents({ type: 'CREATE_EVENT', payload: {} });
             }
@@ -123,9 +137,9 @@ const App = () => {
             api.listUpcomingEvents(5)
                 .then(response => {
                     let upcomingEvents = response.result.items;
-                    console.log('handleGetEvents');
-                    console.log('upcomingEvents');
-                    console.log(upcomingEvents);
+                    // console.log('handleGetEvents');
+                    // console.log('upcomingEvents');
+                    // console.log(upcomingEvents);
 
                     if (upcomingEvents.length > 0) {
 
@@ -134,10 +148,9 @@ const App = () => {
                             single = {
                                 ...upcomingEvent,
                                 // title: upcomingEvent.summary,
-                                // start: new Date(upcomingEvent.start.dateTime),
-                                // end: new Date(upcomingEvent.end.dateTime),
-                                start: upcomingEvent.start.date,
-                                end: upcomingEvent.end.date,
+                                // For some reason there are times where the start and ending time of event comes as DateTime and other as just date (!?) 
+                                start: upcomingEvent.start.dateTime ? new Date(upcomingEvent.start.dateTime) : upcomingEvent.start.date,
+                                end: upcomingEvent.end.dateTime ? new Date(upcomingEvent.end.dateTime) : upcomingEvent.end.date,
                                 allDay: false
                             };
                             // console.log("SINGLE");
@@ -166,10 +179,10 @@ const App = () => {
                 dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, summary: e.target.value } });
                 break;
             case 'init_date':
-                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, start: e.target.value } });
+                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, start: (e.target.value) } });
                 break;
             case 'end_date':
-                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, end: e.target.value } });
+                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, end: (e.target.value) } });
                 break;
             default:
                 console.log('something odd happened!');
@@ -188,18 +201,72 @@ const App = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
-    const handleEventSave = () => {
+    const handleEventSave = async () => {
+        dispatchEvents({ type: 'WAIT' });
         let { modalEvent } = events;
 
         if (modalEvent.id) {
-            dispatchEvents({ type: 'UPDATE_EVENT', payload: modalEvent });
+            let response = await api.updateEvent({
+                ...modalEvent,
+                // start: new Date(modalEvent.start).toISOString(),
+                // end: new Date(modalEvent.end).toISOString()
+                start: {
+                    dateTime: new Date(modalEvent.start).toISOString(),
+                    timeZone: 'Europe/Madrid',
+                },
+                end: {
+                    dateTime: new Date(modalEvent.end).toISOString(),
+                    timeZone: 'Europe/Madrid',
+                },
+            }, modalEvent.id);
+            // console.log('UPDATE_EVENT');
+            // console.log(response.status);
+
+            if (response.status === 200) {
+                let { result } = response;
+
+                dispatchEvents({
+                    type: 'UPDATE_EVENT', payload:
+                    {
+                        ...result,
+                        start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
+                        end: result.end.dateTime ? new Date(result.end.dateTime) : result.end.date,
+                    }
+                });
+            }
         } else {
-            dispatchEvents({ type: 'CREATE_EVENT', payload: modalEvent });
+            let response = await api.createEvent(
+                {
+                    ...modalEvent,
+                    // start: new Date(modalEvent.start).toISOString(),
+                    // end: new Date(modalEvent.end).toISOString()
+                    start: {
+                        dateTime: new Date(modalEvent.start).toISOString(),
+                        timeZone: 'Europe/Madrid',
+                    },
+                    end: {
+                        dateTime: new Date(modalEvent.end).toISOString(),
+                        timeZone: 'Europe/Madrid',
+                    },
+                });
+
+
+            if (response.status === 200) {
+                let { result } = response;
+
+
+                dispatchEvents({
+                    type: 'CREATE_EVENT', payload:
+                    {
+                        ...result,
+                        start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
+                        end: result.end.dateTime ? new Date(result.end.dateTime) : result.end.date,
+                    }
+                });
+            }
         }
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
-
-
 
 
     return (
@@ -207,7 +274,7 @@ const App = () => {
             <div className="container is-fluid">
                 <div>
                     <p>
-                        Calendar
+                       {userName ? <>Agenda de <strong>{userName}</strong></> : 'Calendario'} 
                     </p>
                     <div className="buttons">
                         {events.isLoged
@@ -238,6 +305,12 @@ const App = () => {
                     }
                 </div>
 
+                {/* TODO Progamatically change message and style of this component */}
+                {/* <div class="notification is-warning is-light">
+                    <button class="delete"></button>
+                    No events
+                </div> */}
+
 
                 {/* Loading indicator */}
                 <div className={`modal ${events.isLoading ? 'is-active' : ''}`}>
@@ -265,7 +338,7 @@ const App = () => {
                         <div className="field">
                             <label className="label">Inicio</label>
                             <div className="control has-icons-right">
-                                <input id="init_date" className="input" type="date" placeholder="Inicio" value={events.modalEvent.start} onChange={(e) => handleInputChange(e)} />
+                                <input id="init_date" className="input" type="date" min={NOW} placeholder="Inicio" value={events.modalEvent.start} onChange={(e) => handleInputChange(e)} />
                                 <span className="icon is-small is-right">
                                     <i className="fas fa-check"></i>
                                 </span>
@@ -275,7 +348,7 @@ const App = () => {
                         <div className="field">
                             <label className="label">Fin</label>
                             <div className="control has-icons-right">
-                                <input id="end_date" className="input" type="date" placeholder="Fin" value={events.modalEvent.end} onChange={(e) => handleInputChange(e)} />
+                                <input id="end_date" className="input" type="date" min={NOW} placeholder="Fin" value={events.modalEvent.end} onChange={(e) => handleInputChange(e)} />
                                 <span className="icon is-small is-right">
                                     <i className="fas fa-check"></i>
                                 </span>
@@ -290,9 +363,11 @@ const App = () => {
                             <p className="control">
                                 <Button classes={["button"]} onClickHandler={handleModalClose} tag="Close" />
                             </p>
-                            <p className="control">
-                                <Button classes={["button", "is-danger"]} onClickHandler={handleEventDelete} tag="Delete" />
-                            </p>
+                            {events.modalEvent.id &&
+                                <p className="control">
+                                    <Button classes={["button", "is-danger"]} onClickHandler={handleEventDelete} tag="Delete" />
+                                </p>
+                            }
                         </div>
 
                     </div>

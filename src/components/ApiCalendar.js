@@ -152,7 +152,7 @@ class ApiCalendar {
      * @param {string} timeZone The time zone in which the time is specified. (Formatted as an IANA Time Zone Database name, e.g. "Europe/Zurich".)
      * @returns {any}
      */
-    createEventFromNow({ time, summary, description = '' }, calendarId = this.calendar, timeZone = 'Europe/Paris') {
+    createEventFromNow({ time, summary, description = '' }, calendarId = this.calendar, timeZone = 'Europe/Madrid') {
         const event = {
             summary,
             description,
