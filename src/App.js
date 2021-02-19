@@ -1,4 +1,5 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useReducer } from 'react';
+// import { useEffect, useState } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
@@ -52,7 +53,7 @@ const App = () => {
         { data: [], modalEvent: {}, isLoading: false, isError: false, isLoged: false, modalIsVisible: false }
     );
 
-    const handleLogin = async (event) => {
+    const handleLogin = async () => {
         dispatchEvents({ type: 'WAIT' });
         try {
             await api.handleAuthClick();
@@ -62,7 +63,7 @@ const App = () => {
         }
     }
 
-    const handleLogout = async (event) => {
+    const handleLogout = async () => {
         dispatchEvents({ type: 'WAIT' });
         try {
             await api.handleSignoutClick();
@@ -72,7 +73,7 @@ const App = () => {
         }
     }
 
-    const handleModalClose = (event) => {
+    const handleModalClose = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
@@ -115,35 +116,45 @@ const App = () => {
 
     };
 
-    const handleGetEvents = (e) => {
+    const handleGetEvents = () => {
         dispatchEvents({ type: 'WAIT' });
 
-        api.listUpcomingEvents(5)
-            .then(response => {
-                let upcomingEvents = response.result.items;
+        try {
+            api.listUpcomingEvents(5)
+                .then(response => {
+                    let upcomingEvents = response.result.items;
+                    console.log('handleGetEvents');
+                    console.log('upcomingEvents');
+                    console.log(upcomingEvents);
 
-                if (upcomingEvents.length > 0) {
+                    if (upcomingEvents.length > 0) {
 
-                    let single = {}, all = [];
-                    upcomingEvents.map(upcomingEvent => {
-                        single = {
-                            ...upcomingEvent,
-                            // title: upcomingEvent.summary,
-                            start: new Date(upcomingEvent.start.dateTime),
-                            end: new Date(upcomingEvent.end.dateTime),
-                            allDay: false
-                        };
-                        // console.log("SINGLE");
-                        // console.log(single);
-                        all.push(single);
-                    });
-                    // console.log("ALL");
-                    // console.log(all);
-                    dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: all });
-                } else {
-                    dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: [] });
-                }
-            });
+                        let single = {}, all = [];
+                        upcomingEvents.map(upcomingEvent => {
+                            single = {
+                                ...upcomingEvent,
+                                // title: upcomingEvent.summary,
+                                // start: new Date(upcomingEvent.start.dateTime),
+                                // end: new Date(upcomingEvent.end.dateTime),
+                                start: upcomingEvent.start.date,
+                                end: upcomingEvent.end.date,
+                                allDay: false
+                            };
+                            // console.log("SINGLE");
+                            // console.log(single);
+                            all.push(single);
+                        });
+                        // console.log("ALL");
+                        // console.log(all);
+                        dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: all });
+                    } else {
+                        dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: [] });
+                    }
+                });
+        } catch (err) {
+            console.log(err);
+            dispatchEvents({ type: 'EVENTS_FETCH_FAILURE' });
+        }
     }
 
     const handleInputChange = (e) => {
@@ -165,15 +176,14 @@ const App = () => {
         }
     }
 
-    const handleEventDelete = () => {
+    const handleEventDelete = async () => {
         dispatchEvents({ type: 'WAIT' });
 
-        let response = api.deleteEvent(events.modalEvent.id);
+        let response = await api.deleteEvent(events.modalEvent.id);
 
         if (response.status === 204) {
             dispatchEvents({ type: 'DELETE_EVENT', payload: events.modalEvent });
         }
-
 
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
@@ -242,7 +252,7 @@ const App = () => {
                 {/* Event editing modal */}
                 <div className={`modal ${events.modalIsVisible ? 'is-active' : ''}`}>
                     {/* <div className={'modal is-active'}> */}
-                    <div className="modal-background" onClick={(e) => handleModalClose(e)}></div>
+                    <div className="modal-background" onClick={() => handleModalClose()}></div>
                     <div className="modal-content">
 
                         <div className="field">
@@ -286,7 +296,7 @@ const App = () => {
                         </div>
 
                     </div>
-                    <button className="modal-close is-large" aria-label="close" onClick={(e) => handleModalClose(e)}></button>
+                    <button className="modal-close is-large" aria-label="close" onClick={handleModalClose}></button>
                 </div>
             </div>
             {/* --- */}
