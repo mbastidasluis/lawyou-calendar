@@ -165,7 +165,7 @@ const App = () => {
     }
 
     const handleInputChange = (e) => {
-        console.log(e.target.value);
+        // console.log(e.target.value);
         let { modalEvent } = events;
 
         switch (e.target.id) {
