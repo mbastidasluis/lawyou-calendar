@@ -4,8 +4,11 @@ import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import API_CALENDAR from './components/ApiCalendar';
 
-const NOW = moment().format("yyyy-MM-DD");
-// console.log(NOW);
+const DATE_FORMAT = 'yyyy-MM-DD';
+const TIME_FORMAT = 'HH:mm';
+const NOW = moment();
+const STRING_NOW = moment().format(DATE_FORMAT);
+
 const localizer = momentLocalizer(moment);
 
 
@@ -13,8 +16,12 @@ const eventsReducer = (state, action) => {
     switch (action.type) {
         case 'WAIT':
             return { ...state, isLoading: true, isError: false };
+        case 'ERROR':
+            return { ...state, isLoading: false, modalIsVisible: false, isError: true, errorMessage: action.payload };
+        case 'ERROR_CLOSE':
+            return { ...state, isLoading: false, isError: false, errorMessage: '' };
         case 'LOGIN_SUCCESS':
-            return { ...state, isLoading: false, isError: false, isLoged: true };
+            return { ...state, isError: false, isLoged: true };
         case 'LOGOUT':
             return { ...state, data: [], isLoading: false, isError: false, isLoged: false };
         case 'EVENTS_FETCH_SUCCESS':
@@ -52,7 +59,7 @@ const App = () => {
 
     const [events, dispatchEvents] = useReducer(
         eventsReducer,
-        { data: [], modalEvent: {}, isLoading: false, isError: false, isLoged: false, modalIsVisible: false }
+        { data: [], modalEvent: {}, isLoading: false, isError: false, errorMessage: '', isLoged: false, modalIsVisible: false }
     );
 
     useEffect(() => {
@@ -69,6 +76,8 @@ const App = () => {
         try {
             await api.handleAuthClick();
             dispatchEvents({ type: 'LOGIN_SUCCESS' });
+            //Get events automaticalli
+            handleGetEvents();
         } catch (err) {
             alert(err);
         }
@@ -88,45 +97,26 @@ const App = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
-    const handleEventSelection = (event = undefined) => {
+    const handleEventSelection = (event) => {
 
-        // <>
-        // {/* // console.log('handleEventSelection - PRE-DISPATCH ');
-        // // console.log('EVENT');
-        // // console.log(event);
-        // // console.log('MODAL EVENT');
-        // // console.log(events.modalEvent);
-        // // console.log('MODAL');
-        // // console.log(events.modalIsVisible);
+        //Avoid creating events in the past
+        if (NOW.isAfter(event.start)) { return; }
 
-
-        // // console.log('handleEventSelection - POST-DISPATCH ');
-        // // console.log('EVENT');
-        // // console.log(event);
-        // // console.log('MODAL EVENT');
-        // // console.log(events.modalEvent);
-        // // console.log('MODAL');
-        // // console.log(events.modalIsVisible); */}
-        // </>
-
-        try {
-            if (event) {
-                // alert('SINGLE_EVENT_MANAGEMENT');
-                // alert('UPDATE_EVENT');
-                dispatchEvents({ type: 'SINGLE_EVENT_MANAGEMENT', payload: event });
-                // dispatchEvents({ type: 'UPDATE_EVENT', payload: event });
-            } else {
-                // alert('SINGLE_EVENT_MANAGEMENT');
-                // alert('CREATE_EVENT');
-                dispatchEvents({ type: 'SINGLE_EVENT_MANAGEMENT', payload: { summary: 'Título', start: new Date().toString(), end: new Date().toString() } });
-
-                dispatchEvents({ type: 'CREATE_EVENT', payload: {} });
+        const START_DATE = moment(event.start);
+        const END_DATE = moment(event.end);
+        // alert('SINGLE_EVENT_MANAGEMENT');
+        // alert('UPDATE_EVENT');
+        dispatchEvents({
+            type: 'SINGLE_EVENT_MANAGEMENT',
+            payload: {
+                ...event,
+                summary: event.id ? event.summary : 'Nuevo Evento',
+                start_date: START_DATE.format(DATE_FORMAT),
+                end_date: END_DATE.format(DATE_FORMAT),
+                start_time: START_DATE.format(TIME_FORMAT),
+                end_time: END_DATE.format(TIME_FORMAT)
             }
-
-            // dispatchEvents({ type: 'SINGLE_EVENT_MANAGEMENT_SUCCESS' });
-        } catch (err) {
-            console.log(err);
-        }
+        });
 
     };
 
@@ -145,13 +135,17 @@ const App = () => {
 
                         let single = {}, all = [];
                         upcomingEvents.map(upcomingEvent => {
+                            // For some reason there are times where the start and ending time of event comes as DateTime and other as just date (!?) 
+                            let start = upcomingEvent.start.dateTime ? new Date(upcomingEvent.start.dateTime) : upcomingEvent.start.date;
+                            let end = upcomingEvent.end.dateTime ? new Date(upcomingEvent.end.dateTime) : upcomingEvent.end.date;
                             single = {
                                 ...upcomingEvent,
                                 // title: upcomingEvent.summary,
-                                // For some reason there are times where the start and ending time of event comes as DateTime and other as just date (!?) 
-                                start: upcomingEvent.start.dateTime ? new Date(upcomingEvent.start.dateTime) : upcomingEvent.start.date,
-                                end: upcomingEvent.end.dateTime ? new Date(upcomingEvent.end.dateTime) : upcomingEvent.end.date,
-                                allDay: false
+                                start: start,
+                                start_time: moment(start).format('MM:ss'),
+                                end: end,
+                                end_time: moment(end).format('MM:ss'),
+                                // allDay: false
                             };
                             // console.log("SINGLE");
                             // console.log(single);
@@ -171,7 +165,7 @@ const App = () => {
     }
 
     const handleInputChange = (e) => {
-
+        console.log(e.target.value);
         let { modalEvent } = events;
 
         switch (e.target.id) {
@@ -179,10 +173,16 @@ const App = () => {
                 dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, summary: e.target.value } });
                 break;
             case 'init_date':
-                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, start: (e.target.value) } });
+                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, start_date: (e.target.value) } });
+                break;
+            case 'init_date_time':
+                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, start_time: (e.target.value) } });
                 break;
             case 'end_date':
-                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, end: (e.target.value) } });
+                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, end_date: (e.target.value) } });
+                break;
+            case 'end_date_time':
+                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, end_time: (e.target.value) } });
                 break;
             default:
                 console.log('something odd happened!');
@@ -201,9 +201,22 @@ const App = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
+
     const handleEventSave = async () => {
         dispatchEvents({ type: 'WAIT' });
         let { modalEvent } = events;
+
+        const START_DATE = moment(modalEvent.start_date);
+        const END_DATE = moment(modalEvent.end_date);
+
+        if (START_DATE.isAfter(END_DATE) || modalEvent.start_time.split(':')[0] > modalEvent.end_time.split(':')[0]) {
+            dispatchEvents({
+                type: 'ERROR',
+                payload: 'Fecha y hora de inicio de cita deben ser previas a la fecha y hora de fin de la misma.'
+            });
+            return;
+        }
+
 
         if (modalEvent.id) {
             let response = await api.updateEvent({
@@ -211,11 +224,11 @@ const App = () => {
                 // start: new Date(modalEvent.start).toISOString(),
                 // end: new Date(modalEvent.end).toISOString()
                 start: {
-                    dateTime: new Date(modalEvent.start).toISOString(),
+                    dateTime: moment(modalEvent.start_date + ' ' + modalEvent.start_time).toISOString(),
                     timeZone: 'Europe/Madrid',
                 },
                 end: {
-                    dateTime: new Date(modalEvent.end).toISOString(),
+                    dateTime: moment(modalEvent.end_date + ' ' + modalEvent.end_time).toISOString(),
                     timeZone: 'Europe/Madrid',
                 },
             }, modalEvent.id);
@@ -241,11 +254,11 @@ const App = () => {
                     // start: new Date(modalEvent.start).toISOString(),
                     // end: new Date(modalEvent.end).toISOString()
                     start: {
-                        dateTime: new Date(modalEvent.start).toISOString(),
+                        dateTime: moment(modalEvent.start_date + ' ' + modalEvent.start_time).toISOString(),
                         timeZone: 'Europe/Madrid',
                     },
                     end: {
-                        dateTime: new Date(modalEvent.end).toISOString(),
+                        dateTime: moment(modalEvent.end_date + ' ' + modalEvent.end_time).toISOString(),
                         timeZone: 'Europe/Madrid',
                     },
                 });
@@ -256,7 +269,8 @@ const App = () => {
 
 
                 dispatchEvents({
-                    type: 'CREATE_EVENT', payload:
+                    type: 'CREATE_EVENT',
+                    payload:
                     {
                         ...result,
                         start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
@@ -268,13 +282,18 @@ const App = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
+    const handleErrorMesage = () => {
+        dispatchEvents({ type: 'ERROR_CLOSE' });
+    }
+
 
     return (
         <>
             <div className="container is-fluid">
                 <div>
                     <p>
-                       {userName ? <>Agenda de <strong>{userName}</strong></> : 'Calendario'} 
+                        {/* Name of the user's agenda that's being managed */}
+                        {userName ? <>Agenda de <strong>{userName}</strong></> : 'Calendario'}
                     </p>
                     <div className="buttons">
                         {events.isLoged
@@ -297,7 +316,8 @@ const App = () => {
                                 endAccessor="end"
                                 style={{ height: 640 }}
                                 onSelectEvent={event => handleEventSelection(event)}
-                                onSelectSlot={() => handleEventSelection()}
+                                onSelectSlot={event => handleEventSelection(event)}
+                            // onSelectSlot={(e)=>console.log(e)}
                             />
                             :
 
@@ -306,10 +326,10 @@ const App = () => {
                 </div>
 
                 {/* TODO Progamatically change message and style of this component */}
-                {/* <div class="notification is-warning is-light">
-                    <button class="delete"></button>
-                    No events
-                </div> */}
+                <div className={`notification is-danger is-light ${!events.isError ? 'is-hidden' : ''}`}>
+                    <button className="delete" onClick={handleErrorMesage}></button>
+                    {events.errorMessage}
+                </div>
 
 
                 {/* Loading indicator */}
@@ -326,50 +346,93 @@ const App = () => {
                 <div className={`modal ${events.modalIsVisible ? 'is-active' : ''}`}>
                     {/* <div className={'modal is-active'}> */}
                     <div className="modal-background" onClick={() => handleModalClose()}></div>
-                    <div className="modal-content">
+                    <div className="modal-card">
 
-                        <div className="field">
-                            <label className="label">Título</label>
-                            <div className="control">
-                                <input id="summary" className="input" type="text" placeholder="Text input" value={events.modalEvent.summary} onChange={e => handleInputChange(e)} />
+                        <header className="modal-card-head">
+                            <p className="modal-card-title">{events.modalEvent.id ? 'Editar cita' : 'Agendar cita'}</p>
+                            <button className="delete" aria-label="close"></button>
+                        </header>
+
+                        <section className="modal-card-body">
+                            <div className="field is-horizontal">
+                                <div className="field-label is-normal">
+                                    <label className="label">Título</label>
+                                </div>
+                                <div className="field-body">
+                                    <div className="field">
+                                        <p className="control is-expanded has-icons-left">
+                                            <input id="summary" className="input" type="text" placeholder="Text input" value={events.modalEvent.summary} onChange={e => handleInputChange(e)} />
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="field">
-                            <label className="label">Inicio</label>
-                            <div className="control has-icons-right">
-                                <input id="init_date" className="input" type="date" min={NOW} placeholder="Inicio" value={events.modalEvent.start} onChange={(e) => handleInputChange(e)} />
-                                <span className="icon is-small is-right">
-                                    <i className="fas fa-check"></i>
-                                </span>
+                            <div className="field is-horizontal">
+                                <div className="field-label is-normal">
+                                    <label className="label">Inicio</label>
+                                </div>
+                                <div className="field-body">
+                                    <div className="field">
+                                        <p className="control is-expanded has-icons-left">
+                                            <input id="init_date" className="input" type="date" min={STRING_NOW} placeholder="Inicio" value={events.modalEvent.start_date} onChange={(e) => handleInputChange(e)} />
+                                        </p>
+                                    </div>
+                                    <div className="field">
+                                        <p className="control is-expanded has-icons-left has-icons-right">
+                                            <input id="init_date_time" className="input" type="time" min="08:00" max="18:00" value={events.modalEvent.start_time} onChange={(e) => handleInputChange(e)} />
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="field">
-                            <label className="label">Fin</label>
-                            <div className="control has-icons-right">
-                                <input id="end_date" className="input" type="date" min={NOW} placeholder="Fin" value={events.modalEvent.end} onChange={(e) => handleInputChange(e)} />
-                                <span className="icon is-small is-right">
-                                    <i className="fas fa-check"></i>
-                                </span>
+                            <div className="field is-horizontal">
+                                <div className="field-label is-normal">
+                                    <label className="label">Fin</label>
+                                </div>
+                                <div className="field-body">
+                                    <div className="field">
+                                        <p className="control is-expanded has-icons-left">
+                                            <input id="end_date" className="input" type="date" min={STRING_NOW} placeholder="Fin" value={events.modalEvent.end_date} onChange={(e) => handleInputChange(e)} />
+                                        </p>
+                                    </div>
+                                    <div className="field">
+                                        <p className="control is-expanded has-icons-left has-icons-right">
+                                            <input id="end_date_time" className="input" type="time" min="08:00" max="18:00" value={events.modalEvent.end_time} onChange={(e) => handleInputChange(e)} />
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </section>
 
+                        <footer className="modal-card-foot">
+                            <div className="field is-horizontal">
+                                <div className="field-label is-normal">
+                                    <label className="label"></label>
+                                </div>
+                                <div className="field-body">
+                                    <div className="field">
+                                        <p className="control is-expanded has-icons-left">
+                                            <Button classes={["button", "is-link"]} onClickHandler={handleEventSave} tag="Guardar" />
+                                        </p>
+                                    </div>
+                                    <div className="field">
+                                        <p className="control is-expanded has-icons-left">
+                                            <Button classes={["button"]} onClickHandler={handleModalClose} tag="Cerrar" />
+                                        </p>
+                                    </div>
+                                    {events.modalEvent.id &&
+                                        <p className="control">
+                                            <div className="field">
+                                                <p className="control is-expanded has-icons-left">
+                                                    <Button classes={["button", "is-danger"]} onClickHandler={handleEventDelete} tag="Eliminar" />
+                                                </p>
+                                            </div>
+                                        </p>
+                                    }
 
-                        <div className="field is-grouped">
-                            <p className="control">
-                                <Button classes={["button", "is-link"]} onClickHandler={handleEventSave} tag="Save" />
-                            </p>
-                            <p className="control">
-                                <Button classes={["button"]} onClickHandler={handleModalClose} tag="Close" />
-                            </p>
-                            {events.modalEvent.id &&
-                                <p className="control">
-                                    <Button classes={["button", "is-danger"]} onClickHandler={handleEventDelete} tag="Delete" />
-                                </p>
-                            }
-                        </div>
-
+                                </div>
+                            </div>
+                        </footer>
                     </div>
                     <button className="modal-close is-large" aria-label="close" onClick={handleModalClose}></button>
                 </div>
@@ -389,13 +452,13 @@ const Button = ({ onClickHandler, tag, classes }) => {
 
 const LogedButtons = ({ getEventsHandler, logoutHandler }) =>
     <>
-        <Button classes={['button', 'is-info']} onClickHandler={getEventsHandler} tag="Get Events" />
-        <Button classes={['button', 'is-danger']} onClickHandler={logoutHandler} tag="Sign-Out" />
+        <Button classes={['button', 'is-info']} onClickHandler={getEventsHandler} tag="Actualizar" />
+        <Button classes={['button', 'is-danger']} onClickHandler={logoutHandler} tag="Cerrar" />
     </>;
 
 const LogoutButtons = ({ signInHandler }) =>
     <>
-        <Button classes={['button', 'is-success']} onClickHandler={signInHandler} tag="Sign-In" />
+        <Button classes={['button', 'is-success']} onClickHandler={signInHandler} tag="Sincronizar" />
     </>;
 
 export default App;
