@@ -1,16 +1,33 @@
 import { useEffect, useReducer, useState } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
+import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import API_CALENDAR from './components/ApiCalendar';
 
 const DATE_FORMAT = 'yyyy-MM-DD';
 const TIME_FORMAT = 'HH:mm';
-const NOW = moment();
+const NOW = moment().locale('es');
+console.log(NOW.get('month'))
+const MIN_TIME = moment().set('hour', 8).set('minute', 0).toDate();
+const MAX_TIME = moment().set('hour', 20).set('minute', 0).toDate();
 const STRING_NOW = moment().format(DATE_FORMAT);
+const CALENDAR_TAGS_ES = {
+    allDay: 'Todo el día',
+    agenda: 'Agenda',
+    previous: 'Anterior',
+    next: 'Siguiente',
+    today: 'Hoy',
+    month: 'Mes',
+    week: 'Semana',
+    work_week: 'Semana',
+    day: 'Día',
+    date: 'Fecha',
+    time: 'Hora',
+    event: 'Evento',
+};
 
 const localizer = momentLocalizer(moment);
-
 
 const eventsReducer = (state, action) => {
     switch (action.type) {
@@ -79,7 +96,8 @@ const App = () => {
             //Get events automaticalli
             handleGetEvents();
         } catch (err) {
-            alert(err);
+            console.log(err);
+            dispatchEvents({ type: 'ERROR', payload: 'Imposible iniciar sesión' });
         }
     }
 
@@ -98,9 +116,10 @@ const App = () => {
     }
 
     const handleEventSelection = (event) => {
+        const dayNum = event.start.getDay();
 
-        //Avoid creating events in the past
-        if (NOW.isAfter(event.start)) { return; }
+        //Avoid creating events in the past, saturdays or sundays
+        if (NOW.isAfter(event.start) || dayNum === 0 || dayNum === 6) { return; }
 
         const START_DATE = moment(event.start);
         const END_DATE = moment(event.end);
@@ -124,7 +143,7 @@ const App = () => {
         dispatchEvents({ type: 'WAIT' });
 
         try {
-            api.listUpcomingEvents(5)
+            api.listUpcomingEvents(10)
                 .then(response => {
                     let upcomingEvents = response.result.items;
                     // console.log('handleGetEvents');
@@ -305,27 +324,38 @@ const App = () => {
                 <div>
                     {
                         events.isLoged
-
                             ?
                             <Calendar
                                 selectable
+                                min={MIN_TIME}
+                                max={MAX_TIME}
                                 titleAccessor="summary"
                                 localizer={localizer}
                                 events={events.data}
                                 startAccessor="start"
                                 endAccessor="end"
                                 style={{ height: 640 }}
+                                defaultView={'work_week'}
+                                views={['day', 'work_week', 'agenda']}
+                                messages={CALENDAR_TAGS_ES}
                                 onSelectEvent={event => handleEventSelection(event)}
                                 onSelectSlot={event => handleEventSelection(event)}
-                            // onSelectSlot={(e)=>console.log(e)}
                             />
                             :
-
-                            <Calendar localizer={localizer} events={[]} style={{ height: 640 }} />
+                            <Calendar
+                                events={[]}
+                                min={MIN_TIME}
+                                max={MAX_TIME}
+                                localizer={localizer}
+                                style={{ height: 640 }}
+                                messages={CALENDAR_TAGS_ES}
+                                defaultView={'work_week'}
+                                views={['day', 'work_week', 'agenda']}
+                            />
                     }
                 </div>
 
-                {/* TODO Progamatically change message and style of this component */}
+                {/* Error message block */}
                 <div className={`notification is-danger is-light ${!events.isError ? 'is-hidden' : ''}`}>
                     <button className="delete" onClick={handleErrorMesage}></button>
                     {events.errorMessage}
@@ -350,7 +380,7 @@ const App = () => {
 
                         <header className="modal-card-head">
                             <p className="modal-card-title">{events.modalEvent.id ? 'Editar cita' : 'Agendar cita'}</p>
-                            <button className="delete" aria-label="close"></button>
+                            <button className="delete" aria-label="close" onClick={() => handleModalClose()}></button>
                         </header>
 
                         <section className="modal-card-body">
