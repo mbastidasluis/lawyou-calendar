@@ -220,6 +220,12 @@ const App = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
+    //Handler to test delegate management model to manage multiple calendars with a single account
+    const handleCalendarChange = (newCalendarId) => {
+        api.setCalendar(newCalendarId);
+        handleGetEvents();
+    }
+
 
     const handleEventSave = async () => {
         dispatchEvents({ type: 'WAIT' });
@@ -316,7 +322,7 @@ const App = () => {
                     </p>
                     <div className="buttons">
                         {events.isLoged
-                            ? <LogedButtons getEventsHandler={handleGetEvents} logoutHandler={handleLogout} />
+                            ? <LogedButtons changeCalendarHandle={handleCalendarChange} getEventsHandler={handleGetEvents} logoutHandler={handleLogout} />
                             : <LogoutButtons signInHandler={handleLogin} />}
                     </div>
                 </div>
@@ -480,8 +486,16 @@ const Button = ({ onClickHandler, tag, classes }) => {
     );
 };
 
-const LogedButtons = ({ getEventsHandler, logoutHandler }) =>
+const LogedButtons = ({ changeCalendarHandle, getEventsHandler, logoutHandler }) =>
     <>
+        {/* //Button to test delegate management model to manage multiple calendars with a single account */}
+        {/* <Button classes={['button', 'is-info']} onClickHandler={changeCalendarHandle} tag="Cambiar" /> */}
+        <div class="select">
+            <select onChange={e => { changeCalendarHandle(e.target.value) }}>
+                <option value="law.you.test@gmail.com">Abogado 1</option>
+                <option value="law.you.test.lawyer@gmail.com">Abogado 2</option>
+            </select>
+        </div>
         <Button classes={['button', 'is-info']} onClickHandler={getEventsHandler} tag="Actualizar" />
         <Button classes={['button', 'is-danger']} onClickHandler={logoutHandler} tag="Cerrar" />
     </>;
