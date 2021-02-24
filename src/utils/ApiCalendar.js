@@ -283,6 +283,9 @@ class ApiCalendar {
         }
     }
 }
+/**
+ * Instance of the API Class
+ */
 let apiCalendar;
 try {
     apiCalendar = new ApiCalendar();

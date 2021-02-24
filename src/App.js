@@ -3,29 +3,12 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import API_CALENDAR from './components/ApiCalendar';
+import API_CALENDAR from './utils/ApiCalendar';
 
-const DATE_FORMAT = 'yyyy-MM-DD';
-const TIME_FORMAT = 'HH:mm';
-const NOW = moment().locale('es');
-const MIN_TIME = moment().set('hour', 8).set('minute', 0).toDate();
-const MAX_TIME = moment().set('hour', 20).set('minute', 0).toDate();
-const STRING_NOW = moment().format(DATE_FORMAT);
-const CALENDAR_TAGS_ES = {
-    allDay: 'Todo el día',
-    agenda: 'Agenda',
-    previous: 'Anterior',
-    next: 'Siguiente',
-    today: 'Hoy',
-    month: 'Mes',
-    week: 'Semana',
-    work_week: 'Semana',
-    day: 'Día',
-    date: 'Fecha',
-    time: 'Hora',
-    event: 'Evento',
-};
+// Constantes útiles a lo largo del tiempo de ejecución
+import { DATE_FORMAT, TIME_FORMAT, MIN_TIME, MAX_TIME, STRING_NOW, CALENDAR_TAGS_ES } from './utils/Constants';
 
+// Traductor de la información de fechas y horas mostradas en el calendario
 const localizer = momentLocalizer(moment);
 
 const eventsReducer = (state, action) => {
@@ -69,14 +52,15 @@ const eventsReducer = (state, action) => {
 };
 
 const App = () => {
+
+    // Instancia de la API de calendario
     const api = API_CALENDAR;
 
     const [calendarId, setCalendarId] = useState(api.calendar);
 
     const [events, dispatchEvents] = useReducer(
         eventsReducer,
-        // { data: [], modalEvent: {}, isLoading: false, isError: false, errorMessage: '', isLoged: false, modalIsVisible: false }
-        // The api handles login state 
+        // Estado inicial de variables internas
         { data: [], modalEvent: {}, isLoading: false, isError: false, errorMessage: '', modalIsVisible: false }
     );
 
@@ -84,6 +68,7 @@ const App = () => {
         setCalendarId(api.calendar);
     }, [api.calendar]);
 
+    // Gestión de inicio de sesión - usado en pruebas
     const handleLogin = async () => {
         // dispatchEvents({ type: 'WAIT' });
         try {
@@ -97,6 +82,8 @@ const App = () => {
         }
     }
 
+
+    // Gestión de cierre de sesión
     const handleLogout = async () => {
         dispatchEvents({ type: 'WAIT' });
         try {
@@ -107,6 +94,10 @@ const App = () => {
         }
     }
 
+
+    // Listado de calendarios suscritos por la cuenta maestra 
+    // Sólo muestra calendarios visibles en en la página de Google Calendar
+    // Usado en pruebas
     const handleGetCalendarList = async () => {
         console.log('handleGetCalendarList');
         try {
@@ -122,20 +113,18 @@ const App = () => {
         }
     }
 
+
+    // Gestión de vista del formulario de edición de citas
     const handleModalClose = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
+    // Gestión de selección de celdas del calendario - Prepara los datos para mostrar en el formulario de edición
     const handleEventSelection = (event) => {
-        const dayNum = event.start.getDay();
-
-        //Avoid creating events in the past, saturdays or sundays
-        if (NOW.isAfter(event.start) || dayNum === 0 || dayNum === 6) { return; }
 
         const START_DATE = moment(event.start);
         const END_DATE = moment(event.end);
-        // alert('SINGLE_EVENT_MANAGEMENT');
-        // alert('UPDATE_EVENT');
+
         dispatchEvents({
             type: 'SINGLE_EVENT_MANAGEMENT',
             payload: {
@@ -150,26 +139,26 @@ const App = () => {
 
     };
 
+    // Gestión de consulta de eventos del calendario
     const handleGetEvents = () => {
         dispatchEvents({ type: 'WAIT' });
 
+        // El número representa a cantidad máxima de resultados deseados
         api.listUpcomingEvents(10)
             .then(response => {
                 let upcomingEvents = response.result.items;
-                // console.log('handleGetEvents');
-                // console.log('upcomingEvents');
-                // console.log(upcomingEvents);
 
+                // Si existen eventos agendados
                 if (upcomingEvents.length > 0) {
 
                     let single = {}, all = [];
                     upcomingEvents.map(upcomingEvent => {
-                        // For some reason there are times where the start and ending time of event comes as DateTime and other as just date (!?) 
+                        // Si el evento es de tipo allDay el tipo de dato de Inicio y fin será Date y no Datetime
+                        // Para el calendario es necesario pasar estos valores como Date
                         let start = upcomingEvent.start.dateTime ? new Date(upcomingEvent.start.dateTime) : upcomingEvent.start.date;
                         let end = upcomingEvent.end.dateTime ? new Date(upcomingEvent.end.dateTime) : upcomingEvent.end.date;
                         single = {
                             ...upcomingEvent,
-                            // title: upcomingEvent.summary,
                             start: start,
                             start_time: moment(start).format('MM:ss'),
                             end: end,
@@ -182,8 +171,10 @@ const App = () => {
                     });
                     // console.log("ALL");
                     // console.log(all);
+                    // Se cargan los datos al calendario y se desactiva la pantalla de espera
                     dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: all });
                 } else {
+                    // Se desactiva la pantalla de espera y se pasa un arreglo vacío al calendario
                     dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: [] });
                 }
             }).catch(e => {
@@ -198,6 +189,7 @@ const App = () => {
             });
     }
 
+    // Gestión de los valores temporales usados para crear/actualizar evento
     const handleInputChange = (e) => {
         // console.log(e.target.value);
         let { modalEvent } = events;
@@ -223,6 +215,7 @@ const App = () => {
         }
     }
 
+    // Gestión de eliminación de eventos del calendario
     const handleEventDelete = async () => {
         dispatchEvents({ type: 'WAIT' });
 
@@ -242,23 +235,32 @@ const App = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
-    //Handler to test delegate management model to manage multiple calendars with a single account
+    // Gestión de múltiples calendarios con uns cuenta "Maestra"
     const handleCalendarChange = async (newCalendarId) => {
+        // Al cambiar la cuenta se restablecen los valores del calendario por defecto (vacío)
         dispatchEvents({ type: 'ACCOUNT_CHANGE' });
 
+        // Verifica que se seleccione una cuenta válida
         if (newCalendarId === 'none') { return; }
+
+        // Se cambia el id del calendario (correo gmail) en los valores internos de la API
         api.setCalendar(newCalendarId);
 
+        // Se muestra la pantalla de espera
         dispatchEvents({ type: 'WAIT' });
+
+        // Si no se ha autenticado se realiza el proceso inicialmente
         if (!api.sign) {
             api.handleAuthClick().then(() => {
                 handleGetEvents()
             });
         } else {
+            // Se cargan los eventos asociados a la cuenta seleccionada
             handleGetEvents();
         }
     }
 
+    // Gestión de edición de carga de eventos nuevos/antigüos
     const handleEventSave = async () => {
         dispatchEvents({ type: 'WAIT' });
         let { modalEvent } = events;
@@ -266,6 +268,7 @@ const App = () => {
         const START_DATE = moment(modalEvent.start_date);
         const END_DATE = moment(modalEvent.end_date);
 
+        // Valida que la hora y fecha de inicio sean inferioses a la hora y fecha de fin de la cita
         if (START_DATE.isAfter(END_DATE) || modalEvent.start_time.split(':')[0] > modalEvent.end_time.split(':')[0]) {
             dispatchEvents({
                 type: 'ERROR',
@@ -276,6 +279,7 @@ const App = () => {
 
         try {
 
+            // Si el evento gestionado tiene ID entonces se trata de una edición de un evento anterior 
             if (modalEvent.id) {
                 let response = await api.updateEvent({
                     ...modalEvent,
@@ -306,6 +310,7 @@ const App = () => {
                     });
                 }
             } else {
+                // Creación de un evento nuevo
                 let response = await api.createEvent(
                     {
                         ...modalEvent,
@@ -360,6 +365,7 @@ const App = () => {
                 <div className="field">
                     <div className="field-body mt-4">
                         <div className="field">
+                            {/* Selector de prueba - gestión de múltiples cuentas */}
                             <p className="select">
                                 <select onChange={e => handleCalendarChange(e.target.value)}>
                                     <option value="none">Elige una agenda a gestionar</option>
@@ -369,6 +375,8 @@ const App = () => {
                             </p>
                         </div>
 
+                        {/* Se ocultan estos botones cuando el id del calendario es igual a 'Primary' - aún no se ha seleccionado cuenta de un socio */}
+                        {/* Es decir que estamos hablando de la cuenta maestra - para esta cuenta no gestionamos eventos */}
                         {api.calendar !== 'primary' ?
                             <>
                                 <div className="field">
@@ -388,24 +396,25 @@ const App = () => {
 
                 <hr />
                 <div>
+                    {/* El calendario mostrado dependerá del estado de inicio de sesión */}
                     {
                         api.sign
                             ?
                             <Calendar
-                                selectable
-                                min={MIN_TIME}
-                                max={MAX_TIME}
-                                titleAccessor="summary"
-                                localizer={localizer}
-                                events={events.data}
-                                startAccessor="start"
-                                endAccessor="end"
-                                style={{ height: 640 }}
-                                defaultView={'work_week'}
-                                views={['day', 'work_week', 'agenda']}
-                                messages={CALENDAR_TAGS_ES}
-                                onSelectEvent={event => handleEventSelection(event)}
-                                onSelectSlot={event => handleEventSelection(event)}
+                                selectable                                                  // Habilita la selección de las celdas del calendario
+                                min={MIN_TIME}                                              // Hora mínima habilitada para carga de eventos - por defecto las 8H
+                                max={MAX_TIME}                                              // Hora máxima habilitada para carga de eventos - por defecto las 20H
+                                titleAccessor="summary"                                     // Variable que guarda el título del evento
+                                localizer={localizer}                                       // Traductor de fechas mostradas en el calendario
+                                events={events.data}                                        // Eventos
+                                startAccessor="start"                                       // Variable que guarda el inicio del evento
+                                endAccessor="end"                                           // Variable que guarda el fin del evento
+                                style={{ height: 640 }}                                     // Estilo / tamaño del calendario (obligatorio)
+                                defaultView={'work_week'}                                   // Vista por defecto
+                                views={['day', 'work_week', 'agenda']}                      // Vistas disponibles
+                                messages={CALENDAR_TAGS_ES}                                 // Traducción de etiqueta
+                                onSelectEvent={event => handleEventSelection(event)}        // Gestión de celdas con eventos 
+                                onSelectSlot={event => handleEventSelection(event)}         // Gestión de celdas vacías    
                             />
                             :
                             <Calendar
@@ -421,14 +430,14 @@ const App = () => {
                     }
                 </div>
 
-                {/* Error message block */}
+                {/* Bloque usado para mostrar mensajes de error */}
                 <div className={`notification is-danger is-light ${!events.isError ? 'is-hidden' : ''}`}>
                     <button className="delete" onClick={handleErrorMesage}></button>
                     {events.errorMessage}
                 </div>
 
 
-                {/* Loading indicator */}
+                {/* Pantalla de espera - modal que inhabilita la interacción con el resto de los componentes mientra se cargan los datos */}
                 <div className={`modal ${events.isLoading ? 'is-active' : ''}`}>
                     <div className="modal-background"></div>
                     <div className="modal-content">
@@ -438,7 +447,7 @@ const App = () => {
                 {/* --- */}
 
 
-                {/* Event editing modal */}
+                {/* Formulario / modal para edición y creación de eventos */}
                 <div className={`modal ${events.modalIsVisible ? 'is-active' : ''}`}>
                     {/* <div className={'modal is-active'}> */}
                     <div className="modal-background" onClick={() => handleModalClose()}></div>
@@ -500,6 +509,7 @@ const App = () => {
                             </div>
                         </section>
 
+                        {/* Botones al final del formulario */}
                         <footer className="modal-card-foot">
                             <div className="field is-horizontal">
                                 <div className="field-body">
@@ -513,6 +523,7 @@ const App = () => {
                                             <Button classes={["button"]} onClickHandler={handleModalClose} tag="Cerrar" />
                                         </p>
                                     </div>
+                                    {/* Botén de eliminación - deshabilitado si el evento no cuenta con ID - es un nuevo evento */}
                                     {events.modalEvent.id &&
                                         <p className="control">
                                             <div className="field">
@@ -534,6 +545,7 @@ const App = () => {
     );
 };
 
+{/* Componente Botón Axiliar */ }
 const Button = ({ onClickHandler, tag, classes }) => {
     return (
         <>
