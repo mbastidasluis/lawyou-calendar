@@ -131,7 +131,7 @@ class ApiCalendar {
     listSharedCalendars() {
         if (this.gapi) {
             return this.gapi.client.calendar.calendarList.list({
-                calendarId: this.calendar
+                calendarId: 'primary'
             });
             // console.log(this.gapi.client);
         }
@@ -195,7 +195,7 @@ class ApiCalendar {
      * @returns {any}
      */
     createEvent(event, calendarId = this.calendar) {
-        console.log('createEvent -- calendarID: ', this.calendar);
+        // console.log('createEvent -- calendarID: ', this.calendar);
         if (this.gapi) {
             try {
                 return this.gapi.client.calendar.events.insert({

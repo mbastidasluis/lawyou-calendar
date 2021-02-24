@@ -37,9 +37,9 @@ const eventsReducer = (state, action) => {
         case 'ERROR_CLOSE':
             return { ...state, isLoading: false, isError: false, errorMessage: '' };
         case 'LOGIN_SUCCESS':
-            return { ...state, isError: false, isLoged: true };
+            return { ...state, isError: false };
         case 'LOGOUT':
-            return { ...state, data: [], modalEvent: {}, isLoading: false, isError: false, isLoged: false };
+            return { ...state, data: [], modalEvent: {}, isLoading: false, isError: false };
         case 'ACCOUNT_CHANGE':
             return { ...state, data: [], modalEvent: {} };
         case 'EVENTS_FETCH_SUCCESS':
@@ -71,21 +71,18 @@ const eventsReducer = (state, action) => {
 const App = () => {
     const api = API_CALENDAR;
 
-    const [userName, setUserName] = useState(undefined);
+    const [calendarId, setCalendarId] = useState(api.calendar);
 
     const [events, dispatchEvents] = useReducer(
         eventsReducer,
-        { data: [], modalEvent: {}, isLoading: false, isError: false, errorMessage: '', isLoged: false, modalIsVisible: false }
+        // { data: [], modalEvent: {}, isLoading: false, isError: false, errorMessage: '', isLoged: false, modalIsVisible: false }
+        // The api handles login state 
+        { data: [], modalEvent: {}, isLoading: false, isError: false, errorMessage: '', modalIsVisible: false }
     );
 
     useEffect(() => {
-        if (events.isLoged) {
-            let profile = api.getBasicUserProfile();
-            setUserName(profile.getName());
-        } else {
-            setUserName(undefined);
-        }
-    }, [events.isLoged]);
+        setCalendarId(api.calendar);
+    }, [api.calendar]);
 
     const handleLogin = async () => {
         // dispatchEvents({ type: 'WAIT' });
@@ -105,6 +102,21 @@ const App = () => {
         try {
             await api.handleSignoutClick();
             dispatchEvents({ type: 'LOGOUT' });
+        } catch (err) {
+            alert(err);
+        }
+    }
+
+    const handleGetCalendarList = async () => {
+        console.log('handleGetCalendarList');
+        try {
+            let response = await api.listSharedCalendars();
+            if (response.status === 200) {
+                let { items } = response.result;
+                items.map(i => {
+                    console.log(i);
+                })
+            }
         } catch (err) {
             alert(err);
         }
@@ -231,15 +243,18 @@ const App = () => {
     }
 
     //Handler to test delegate management model to manage multiple calendars with a single account
-    const handleCalendarChange = (newCalendarId) => {
+    const handleCalendarChange = async (newCalendarId) => {
         dispatchEvents({ type: 'ACCOUNT_CHANGE' });
-        // console.log(newCalendarId);
-        if (newCalendarId !== 'none') {
-            dispatchEvents({ type: 'WAIT' });
-            if (!api.sign) {
-                api.handleAuthClick();
-            }
-            api.setCalendar(newCalendarId);
+
+        if (newCalendarId === 'none') { return; }
+        api.setCalendar(newCalendarId);
+
+        dispatchEvents({ type: 'WAIT' });
+        if (!api.sign) {
+            api.handleAuthClick().then(() => {
+                handleGetEvents()
+            });
+        } else {
             handleGetEvents();
         }
     }
@@ -341,22 +356,40 @@ const App = () => {
     return (
         <>
             <div className="container is-fluid">
-                <div>
-                    <p>
-                        {/* Name of the user's agenda that's being managed */}
-                        {userName ? <>Agenda de <strong>{userName}</strong></> : 'Calendario'}
-                    </p>
-                    <div className="buttons">
-                        {events.isLoged
-                            // ? <LogedButtons changeCalendarHandle={handleCalendarChange} getEventsHandler={handleGetEvents} logoutHandler={handleLogout} />
-                            ? <LogedButtons getEventsHandler={handleGetEvents} />
-                            : <LogoutButtons changeCalendarHandler={handleCalendarChange} />}
+
+                <div className="field">
+                    <div className="field-body mt-4">
+                        <div className="field">
+                            <p className="select">
+                                <select onChange={e => handleCalendarChange(e.target.value)}>
+                                    <option value="none">Elige una agenda a gestionar</option>
+                                    <option value="law.you.test.lawyer@gmail.com">Abogado 2</option>
+                                    <option value="law.you.test.abogado@gmail.com">Abogado 3</option>
+                                </select>
+                            </p>
+                        </div>
+
+                        {api.calendar !== 'primary' ?
+                            <>
+                                <div className="field">
+                                    <p className="control is-expanded">
+                                        <Button classes={['button', 'is-info']} onClickHandler={handleGetEvents} tag="Actualizar" />
+                                    </p>
+                                </div>
+                                <div className="field">
+                                    <p className="control is-expanded">
+                                        <Button classes={['button', 'is-danger']} onClickHandler={handleLogout} tag="Cerrar" />
+                                    </p>
+                                </div>
+                            </>
+                            : ''}
                     </div>
                 </div>
+
                 <hr />
                 <div>
                     {
-                        events.isLoged
+                        api.sign
                             ?
                             <Calendar
                                 selectable
@@ -469,9 +502,6 @@ const App = () => {
 
                         <footer className="modal-card-foot">
                             <div className="field is-horizontal">
-                                <div className="field-label is-normal">
-                                    <label className="label"></label>
-                                </div>
                                 <div className="field-body">
                                     <div className="field">
                                         <p className="control is-expanded has-icons-left">
@@ -492,7 +522,6 @@ const App = () => {
                                             </div>
                                         </p>
                                     }
-
                                 </div>
                             </div>
                         </footer>
@@ -512,24 +541,5 @@ const Button = ({ onClickHandler, tag, classes }) => {
         </>
     );
 };
-
-const LogedButtons = ({ getEventsHandler }) =>
-    <>
-        {/* //Button to test delegate management model to manage multiple calendars with a single account */}
-        <Button classes={['button', 'is-info']} onClickHandler={getEventsHandler} tag="Actualizar" />
-        {/* <Button classes={['button', 'is-danger']} onClickHandler={logoutHandler} tag="Cerrar" /> */}
-    </>;
-
-const LogoutButtons = ({ changeCalendarHandler }) =>
-    <>
-        <div class="select">
-            <select onChange={e => changeCalendarHandler(e.target.value)}>
-                <option value="none">Elige una agenda a gestionar</option>
-                <option value="law.you.test.lawyer@gmail.com">Abogado 2</option>
-                <option value="law.you.test.abogado@gmail.com">Abogado 3</option>
-            </select>
-        </div>
-        {/* <Button classes={['button', 'is-success']} onClickHandler={signInHandler} tag="Sincronizar" /> */}
-    </>;
 
 export default App;
