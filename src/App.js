@@ -8,7 +8,6 @@ import API_CALENDAR from './components/ApiCalendar';
 const DATE_FORMAT = 'yyyy-MM-DD';
 const TIME_FORMAT = 'HH:mm';
 const NOW = moment().locale('es');
-console.log(NOW.get('month'))
 const MIN_TIME = moment().set('hour', 8).set('minute', 0).toDate();
 const MAX_TIME = moment().set('hour', 20).set('minute', 0).toDate();
 const STRING_NOW = moment().format(DATE_FORMAT);
@@ -40,11 +39,11 @@ const eventsReducer = (state, action) => {
         case 'LOGIN_SUCCESS':
             return { ...state, isError: false, isLoged: true };
         case 'LOGOUT':
-            return { ...state, data: [], isLoading: false, isError: false, isLoged: false };
+            return { ...state, data: [], modalEvent: {}, isLoading: false, isError: false, isLoged: false };
+        case 'ACCOUNT_CHANGE':
+            return { ...state, data: [], modalEvent: {} };
         case 'EVENTS_FETCH_SUCCESS':
             return { ...state, data: action.payload, isLoading: false, isError: false };
-        case 'EVENTS_FETCH_FAILURE':
-            return { ...state, isLoading: false, isError: true };
         case 'SINGLE_EVENT_MANAGEMENT':
             return { ...state, modalIsVisible: true, modalEvent: action.payload };
         case 'SINGLE_EVENT_MANAGEMENT_SUCCESS':
@@ -89,7 +88,7 @@ const App = () => {
     }, [events.isLoged]);
 
     const handleLogin = async () => {
-        dispatchEvents({ type: 'WAIT' });
+        // dispatchEvents({ type: 'WAIT' });
         try {
             await api.handleAuthClick();
             dispatchEvents({ type: 'LOGIN_SUCCESS' });
@@ -142,45 +141,49 @@ const App = () => {
     const handleGetEvents = () => {
         dispatchEvents({ type: 'WAIT' });
 
-        try {
-            api.listUpcomingEvents(10)
-                .then(response => {
-                    let upcomingEvents = response.result.items;
-                    // console.log('handleGetEvents');
-                    // console.log('upcomingEvents');
-                    // console.log(upcomingEvents);
+        api.listUpcomingEvents(10)
+            .then(response => {
+                let upcomingEvents = response.result.items;
+                // console.log('handleGetEvents');
+                // console.log('upcomingEvents');
+                // console.log(upcomingEvents);
 
-                    if (upcomingEvents.length > 0) {
+                if (upcomingEvents.length > 0) {
 
-                        let single = {}, all = [];
-                        upcomingEvents.map(upcomingEvent => {
-                            // For some reason there are times where the start and ending time of event comes as DateTime and other as just date (!?) 
-                            let start = upcomingEvent.start.dateTime ? new Date(upcomingEvent.start.dateTime) : upcomingEvent.start.date;
-                            let end = upcomingEvent.end.dateTime ? new Date(upcomingEvent.end.dateTime) : upcomingEvent.end.date;
-                            single = {
-                                ...upcomingEvent,
-                                // title: upcomingEvent.summary,
-                                start: start,
-                                start_time: moment(start).format('MM:ss'),
-                                end: end,
-                                end_time: moment(end).format('MM:ss'),
-                                // allDay: false
-                            };
-                            // console.log("SINGLE");
-                            // console.log(single);
-                            all.push(single);
-                        });
-                        // console.log("ALL");
-                        // console.log(all);
-                        dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: all });
-                    } else {
-                        dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: [] });
-                    }
-                });
-        } catch (err) {
-            console.log(err);
-            dispatchEvents({ type: 'EVENTS_FETCH_FAILURE' });
-        }
+                    let single = {}, all = [];
+                    upcomingEvents.map(upcomingEvent => {
+                        // For some reason there are times where the start and ending time of event comes as DateTime and other as just date (!?) 
+                        let start = upcomingEvent.start.dateTime ? new Date(upcomingEvent.start.dateTime) : upcomingEvent.start.date;
+                        let end = upcomingEvent.end.dateTime ? new Date(upcomingEvent.end.dateTime) : upcomingEvent.end.date;
+                        single = {
+                            ...upcomingEvent,
+                            // title: upcomingEvent.summary,
+                            start: start,
+                            start_time: moment(start).format('MM:ss'),
+                            end: end,
+                            end_time: moment(end).format('MM:ss'),
+                            // allDay: false
+                        };
+                        // console.log("SINGLE");
+                        // console.log(single);
+                        all.push(single);
+                    });
+                    // console.log("ALL");
+                    // console.log(all);
+                    dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: all });
+                } else {
+                    dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: [] });
+                }
+            }).catch(e => {
+                if (e.status === 404) {
+                    dispatchEvents({
+                        type: 'ERROR',
+                        payload: 'Imposible acceder al calendario. Verifique que el propietario haya otorgado su autorización de acceso.'
+                    })
+                } else {
+                    dispatchEvents({ type: 'ERROR', payload: 'Imposible iniciar sesión' });
+                }
+            });
     }
 
     const handleInputChange = (e) => {
@@ -211,10 +214,17 @@ const App = () => {
     const handleEventDelete = async () => {
         dispatchEvents({ type: 'WAIT' });
 
-        let response = await api.deleteEvent(events.modalEvent.id);
+        try {
+            let response = await api.deleteEvent(events.modalEvent.id);
 
-        if (response.status === 204) {
-            dispatchEvents({ type: 'DELETE_EVENT', payload: events.modalEvent });
+            if (response.status === 204) {
+                dispatchEvents({ type: 'DELETE_EVENT', payload: events.modalEvent });
+            }
+        } catch (error) {
+            dispatchEvents({
+                type: 'ERROR',
+                payload: 'Imposible eliminar cita. Verifique que el propietario haya otorgado los permisos correspondientes.'
+            });
         }
 
         dispatchEvents({ type: 'MODAL_CLOSE' });
@@ -222,10 +232,17 @@ const App = () => {
 
     //Handler to test delegate management model to manage multiple calendars with a single account
     const handleCalendarChange = (newCalendarId) => {
-        api.setCalendar(newCalendarId);
-        handleGetEvents();
+        dispatchEvents({ type: 'ACCOUNT_CHANGE' });
+        // console.log(newCalendarId);
+        if (newCalendarId !== 'none') {
+            dispatchEvents({ type: 'WAIT' });
+            if (!api.sign) {
+                api.handleAuthClick();
+            }
+            api.setCalendar(newCalendarId);
+            handleGetEvents();
+        }
     }
-
 
     const handleEventSave = async () => {
         dispatchEvents({ type: 'WAIT' });
@@ -242,39 +259,10 @@ const App = () => {
             return;
         }
 
+        try {
 
-        if (modalEvent.id) {
-            let response = await api.updateEvent({
-                ...modalEvent,
-                // start: new Date(modalEvent.start).toISOString(),
-                // end: new Date(modalEvent.end).toISOString()
-                start: {
-                    dateTime: moment(modalEvent.start_date + ' ' + modalEvent.start_time).toISOString(),
-                    timeZone: 'Europe/Madrid',
-                },
-                end: {
-                    dateTime: moment(modalEvent.end_date + ' ' + modalEvent.end_time).toISOString(),
-                    timeZone: 'Europe/Madrid',
-                },
-            }, modalEvent.id);
-            // console.log('UPDATE_EVENT');
-            // console.log(response.status);
-
-            if (response.status === 200) {
-                let { result } = response;
-
-                dispatchEvents({
-                    type: 'UPDATE_EVENT', payload:
-                    {
-                        ...result,
-                        start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
-                        end: result.end.dateTime ? new Date(result.end.dateTime) : result.end.date,
-                    }
-                });
-            }
-        } else {
-            let response = await api.createEvent(
-                {
+            if (modalEvent.id) {
+                let response = await api.updateEvent({
                     ...modalEvent,
                     // start: new Date(modalEvent.start).toISOString(),
                     // end: new Date(modalEvent.end).toISOString()
@@ -286,23 +274,61 @@ const App = () => {
                         dateTime: moment(modalEvent.end_date + ' ' + modalEvent.end_time).toISOString(),
                         timeZone: 'Europe/Madrid',
                     },
-                });
+                }, modalEvent.id);
+                // console.log('UPDATE_EVENT');
+                // console.log(response.status);
 
+                if (response.status === 200) {
+                    let { result } = response;
 
-            if (response.status === 200) {
-                let { result } = response;
-
-
-                dispatchEvents({
-                    type: 'CREATE_EVENT',
-                    payload:
+                    dispatchEvents({
+                        type: 'UPDATE_EVENT', payload:
+                        {
+                            ...result,
+                            start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
+                            end: result.end.dateTime ? new Date(result.end.dateTime) : result.end.date,
+                        }
+                    });
+                }
+            } else {
+                let response = await api.createEvent(
                     {
-                        ...result,
-                        start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
-                        end: result.end.dateTime ? new Date(result.end.dateTime) : result.end.date,
-                    }
-                });
+                        ...modalEvent,
+                        // start: new Date(modalEvent.start).toISOString(),
+                        // end: new Date(modalEvent.end).toISOString()
+                        start: {
+                            dateTime: moment(modalEvent.start_date + ' ' + modalEvent.start_time).toISOString(),
+                            timeZone: 'Europe/Madrid',
+                        },
+                        end: {
+                            dateTime: moment(modalEvent.end_date + ' ' + modalEvent.end_time).toISOString(),
+                            timeZone: 'Europe/Madrid',
+                        },
+                    });
+
+                if (response.status === 200) {
+                    let { result } = response;
+                    dispatchEvents({
+                        type: 'CREATE_EVENT',
+                        payload:
+                        {
+                            ...result,
+                            start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
+                            end: result.end.dateTime ? new Date(result.end.dateTime) : result.end.date,
+                        }
+                    });
+                } else if (response.status === 403) {
+                    dispatchEvents({
+                        type: 'ERROR',
+                        payload: 'No posee autorización para añadir nuevas citas. Por favor, solicite los permisos correspondientes al titular de esta agenda.'
+                    });
+                }
             }
+        } catch (error) {
+            dispatchEvents({
+                type: 'ERROR',
+                payload: 'Imposible modificar agenda. Verifique que el propietario haya otorgado los permisos correspondientes.'
+            });
         }
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
@@ -322,8 +348,9 @@ const App = () => {
                     </p>
                     <div className="buttons">
                         {events.isLoged
-                            ? <LogedButtons changeCalendarHandle={handleCalendarChange} getEventsHandler={handleGetEvents} logoutHandler={handleLogout} />
-                            : <LogoutButtons signInHandler={handleLogin} />}
+                            // ? <LogedButtons changeCalendarHandle={handleCalendarChange} getEventsHandler={handleGetEvents} logoutHandler={handleLogout} />
+                            ? <LogedButtons getEventsHandler={handleGetEvents} />
+                            : <LogoutButtons changeCalendarHandler={handleCalendarChange} />}
                     </div>
                 </div>
                 <hr />
@@ -486,23 +513,23 @@ const Button = ({ onClickHandler, tag, classes }) => {
     );
 };
 
-const LogedButtons = ({ changeCalendarHandle, getEventsHandler, logoutHandler }) =>
+const LogedButtons = ({ getEventsHandler }) =>
     <>
         {/* //Button to test delegate management model to manage multiple calendars with a single account */}
-        {/* <Button classes={['button', 'is-info']} onClickHandler={changeCalendarHandle} tag="Cambiar" /> */}
-        <div class="select">
-            <select onChange={e => { changeCalendarHandle(e.target.value) }}>
-                <option value="law.you.test@gmail.com">Abogado 1</option>
-                <option value="law.you.test.lawyer@gmail.com">Abogado 2</option>
-            </select>
-        </div>
         <Button classes={['button', 'is-info']} onClickHandler={getEventsHandler} tag="Actualizar" />
-        <Button classes={['button', 'is-danger']} onClickHandler={logoutHandler} tag="Cerrar" />
+        {/* <Button classes={['button', 'is-danger']} onClickHandler={logoutHandler} tag="Cerrar" /> */}
     </>;
 
-const LogoutButtons = ({ signInHandler }) =>
+const LogoutButtons = ({ changeCalendarHandler }) =>
     <>
-        <Button classes={['button', 'is-success']} onClickHandler={signInHandler} tag="Sincronizar" />
+        <div class="select">
+            <select onChange={e => changeCalendarHandler(e.target.value)}>
+                <option value="none">Elige una agenda a gestionar</option>
+                <option value="law.you.test.lawyer@gmail.com">Abogado 2</option>
+                <option value="law.you.test.abogado@gmail.com">Abogado 3</option>
+            </select>
+        </div>
+        {/* <Button classes={['button', 'is-success']} onClickHandler={signInHandler} tag="Sincronizar" /> */}
     </>;
 
 export default App;

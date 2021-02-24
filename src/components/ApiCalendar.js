@@ -5,6 +5,7 @@ class ApiCalendar {
         this.gapi = null;
         this.onLoadCallback = null;
         this.calendar = 'primary';
+        this.calendars = [];
         try {
             this.updateSigninStatus = this.updateSigninStatus.bind(this);
             this.initClient = this.initClient.bind(this);
@@ -115,12 +116,31 @@ class ApiCalendar {
      */
     async handleSignoutClick() {
         if (this.gapi) {
+            this.calendar = 'primary';
             await this.gapi.auth2.getAuthInstance().signOut();
         }
         else {
             console.log('Error: this.gapi not loaded');
         }
     }
+
+    /**
+     * List all shared/managed calendars
+     * @returns {any}
+     */
+    listSharedCalendars() {
+        if (this.gapi) {
+            return this.gapi.client.calendar.calendarList.list({
+                calendarId: this.calendar
+            });
+            // console.log(this.gapi.client);
+        }
+        else {
+            console.log('Error: this.gapi not loaded');
+            return false;
+        }
+    }
+
     /**
      * List all events in the calendar
      * @param {number} maxResults to see
@@ -128,6 +148,7 @@ class ApiCalendar {
      * @returns {any}
      */
     listUpcomingEvents(maxResults, calendarId = this.calendar) {
+        // console.log('listUpcomingEvents -- calendarID: ', this.calendar);
         if (this.gapi) {
             return this.gapi.client.calendar.events.list({
                 calendarId: calendarId,
@@ -174,11 +195,16 @@ class ApiCalendar {
      * @returns {any}
      */
     createEvent(event, calendarId = this.calendar) {
+        console.log('createEvent -- calendarID: ', this.calendar);
         if (this.gapi) {
-            return this.gapi.client.calendar.events.insert({
-                calendarId: calendarId,
-                resource: event,
-            });
+            try {
+                return this.gapi.client.calendar.events.insert({
+                    calendarId: calendarId,
+                    resource: event,
+                });
+            } catch (error) {
+                console.log(error.status, error.statusText);
+            }
         }
         else {
             console.log('Error: this.gapi not loaded');
