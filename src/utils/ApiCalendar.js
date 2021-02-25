@@ -74,12 +74,13 @@ class ApiCalendar {
      */
     async handleAuthClick() {
         if (this.gapi) {
-            await this.gapi.auth2.getAuthInstance().signIn();
+            return await this.gapi.auth2.getAuthInstance().signIn();
         }
         else {
             console.log('Error: this.gapi not loaded');
         }
     }
+    
     /**
      * Set the default attribute calendar
      * @param {string} newCalendar

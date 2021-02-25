@@ -70,18 +70,8 @@ const App = () => {
 
     // Gestión de inicio de sesión - usado en pruebas
     const handleLogin = async () => {
-        // dispatchEvents({ type: 'WAIT' });
-        try {
-            await api.handleAuthClick();
-            dispatchEvents({ type: 'LOGIN_SUCCESS' });
-            //Get events automaticalli
-            handleGetEvents();
-        } catch (err) {
-            console.log(err);
-            dispatchEvents({ type: 'ERROR', payload: 'Imposible iniciar sesión' });
-        }
+        return await api.handleAuthClick();
     }
-
 
     // Gestión de cierre de sesión
     const handleLogout = async () => {
@@ -94,6 +84,47 @@ const App = () => {
         }
     }
 
+    // Gestión de múltiples calendarios con uns cuenta "Maestra"
+    const handleCalendarChange = async (newCalendarId) => {
+        // Al cambiar la cuenta se restablecen los valores del calendario por defecto (vacío)
+        dispatchEvents({ type: 'ACCOUNT_CHANGE' });
+
+        // Verifica que se seleccione una cuenta válida
+        if (newCalendarId === 'none') { return; }
+
+        // Se cambia el id del calendario (correo gmail) en los valores internos de la API
+        api.setCalendar(newCalendarId);
+
+        // Se muestra la pantalla de espera
+        dispatchEvents({ type: 'WAIT' });
+
+        // Si no se ha autenticado se realiza el proceso inicialmente
+        if (!api.sign) {
+            try {
+                api.handleAuthClick().then(
+                    () => {
+                        handleGetEvents();
+                    }, (e) => {
+                        console.log(e.error);
+                        api.handleSignoutClick();
+                        dispatchEvents({
+                            type: 'ERROR',
+                            payload: 'Debe autenticarse para poder gestionar la agenda del abogado.'
+                        })
+                    });
+            } catch (e) {
+                console.log(e.error);
+                api.handleSignoutClick();
+                dispatchEvents({
+                    type: 'ERROR',
+                    payload: 'Imposible iniciar sesión. Verifique e intente nuevamente'
+                });
+            }
+        } else {
+            // Se cargan los eventos asociados a la cuenta seleccionada
+            handleGetEvents();
+        }
+    }
 
     // Listado de calendarios suscritos por la cuenta maestra 
     // Sólo muestra calendarios visibles en en la página de Google Calendar
@@ -235,30 +266,6 @@ const App = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
-    // Gestión de múltiples calendarios con uns cuenta "Maestra"
-    const handleCalendarChange = async (newCalendarId) => {
-        // Al cambiar la cuenta se restablecen los valores del calendario por defecto (vacío)
-        dispatchEvents({ type: 'ACCOUNT_CHANGE' });
-
-        // Verifica que se seleccione una cuenta válida
-        if (newCalendarId === 'none') { return; }
-
-        // Se cambia el id del calendario (correo gmail) en los valores internos de la API
-        api.setCalendar(newCalendarId);
-
-        // Se muestra la pantalla de espera
-        dispatchEvents({ type: 'WAIT' });
-
-        // Si no se ha autenticado se realiza el proceso inicialmente
-        if (!api.sign) {
-            api.handleAuthClick().then(() => {
-                handleGetEvents()
-            });
-        } else {
-            // Se cargan los eventos asociados a la cuenta seleccionada
-            handleGetEvents();
-        }
-    }
 
     // Gestión de edición de carga de eventos nuevos/antigüos
     const handleEventSave = async () => {
