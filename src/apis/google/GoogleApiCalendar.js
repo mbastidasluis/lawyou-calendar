@@ -1,5 +1,6 @@
-const Config = require('../apiGoogleconfig.json');
-class ApiCalendar {
+const Config = require('./apiGoogleconfig.json');
+
+class GoogleApiCalendar {
     constructor() {
         this.sign = false;
         this.gapi = null;
@@ -80,7 +81,7 @@ class ApiCalendar {
             console.log('Error: this.gapi not loaded');
         }
     }
-    
+
     /**
      * Set the default attribute calendar
      * @param {string} newCalendar
@@ -289,7 +290,7 @@ class ApiCalendar {
  */
 let apiCalendar;
 try {
-    apiCalendar = new ApiCalendar();
+    apiCalendar = new GoogleApiCalendar();
 }
 catch (e) {
     console.log(e);

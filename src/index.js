@@ -3,6 +3,15 @@ import ReactDOM from 'react-dom';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+// import { Providers } from '@microsoft/mgt-element';
+// import { MsalProvider } from '@microsoft/mgt-msal-provider';
+
+
+// Providers.globalProvider = new MsalProvider({
+//   clientId: '0c0f09d7-0679-4fbd-8b92-53fb15f969a7',
+//   scopes: ['calendars.readwrite', 'user.read', 'openid', 'user.readbasic.all']
+// });
+
 
 ReactDOM.render(
   <React.StrictMode>

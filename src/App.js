@@ -3,10 +3,15 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import API_CALENDAR from './utils/ApiCalendar';
+import API_CALENDAR from './apis/google/GoogleApiCalendar';
+import { getUserDetails } from './apis/microsoft/GraphApiCalendar';
+import { Providers, ProviderState } from '@microsoft/mgt-element';
+
+import ApiCalendar from './apis/ApiCalendar';
 
 // Constantes útiles a lo largo del tiempo de ejecución
 import { DATE_FORMAT, TIME_FORMAT, MIN_TIME, MAX_TIME, STRING_NOW, CALENDAR_TAGS_ES } from './utils/Constants';
+import { Agenda, Login } from '@microsoft/mgt-react';
 
 // Traductor de la información de fechas y horas mostradas en el calendario
 const localizer = momentLocalizer(moment);
@@ -55,6 +60,9 @@ const App = () => {
 
     // Instancia de la API de calendario
     const api = API_CALENDAR;
+    // const _api = new ApiCalendar();
+
+
 
     const [calendarId, setCalendarId] = useState(api.calendar);
 
@@ -83,6 +91,34 @@ const App = () => {
             alert(err);
         }
     }
+
+    ////////CUSTOM HOOK/////////////////////////
+
+    const useIsSignedIn = () => {
+        const [isSignedIn, setIsSignedIn] = useState(false);
+
+        useEffect(() => {
+            const updateState = () => {
+                const provider = Providers.globalProvider;
+                setIsSignedIn(provider && provider.state === ProviderState.SignedIn);
+            };
+
+            Providers.onProviderUpdated(updateState);
+            updateState();
+
+            return () => {
+                Providers.removeProviderUpdatedListener(updateState);
+            }
+        }, []);
+
+        return [isSignedIn];
+    }
+
+    const [isSignedIn] = useIsSignedIn();
+
+
+    ////////MICROSOFT/////////////////////////
+
 
     // Gestión de múltiples calendarios con uns cuenta "Maestra"
     const handleCalendarChange = async (newCalendarId) => {
@@ -364,6 +400,11 @@ const App = () => {
         dispatchEvents({ type: 'ERROR_CLOSE' });
     }
 
+    const handleLoginMic = () => {
+        console.log('Calling get micro events')
+        getUserDetails();
+    }
+
 
     return (
         <>
@@ -379,6 +420,12 @@ const App = () => {
                                     <option value="law.you.test.lawyer@gmail.com">Abogado 2</option>
                                     <option value="law.you.test.abogado@gmail.com">Abogado 3</option>
                                 </select>
+                            </p>
+                        </div>
+                        <div className="field">
+                            {/* Selector de prueba - gestión de múltiples cuentas */}
+                            <p className="button" onClick={handleLoginMic}>
+                                MICROSOFT LOGIN
                             </p>
                         </div>
 
