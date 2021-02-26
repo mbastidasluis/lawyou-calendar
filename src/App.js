@@ -4,14 +4,13 @@ import moment from 'moment';
 import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import API_CALENDAR from './apis/google/GoogleApiCalendar';
-import { getUserDetails } from './apis/microsoft/GraphApiCalendar';
+import * as graph from './apis/microsoft/index';
 import { Providers, ProviderState } from '@microsoft/mgt-element';
 
 import ApiCalendar from './apis/ApiCalendar';
 
 // Constantes útiles a lo largo del tiempo de ejecución
 import { DATE_FORMAT, TIME_FORMAT, MIN_TIME, MAX_TIME, STRING_NOW, CALENDAR_TAGS_ES } from './utils/Constants';
-import { Agenda, Login } from '@microsoft/mgt-react';
 
 // Traductor de la información de fechas y horas mostradas en el calendario
 const localizer = momentLocalizer(moment);
@@ -60,7 +59,7 @@ const App = () => {
 
     // Instancia de la API de calendario
     const api = API_CALENDAR;
-    // const _api = new ApiCalendar();
+    // const _api = GRAPH;
 
 
 
@@ -400,9 +399,70 @@ const App = () => {
         dispatchEvents({ type: 'ERROR_CLOSE' });
     }
 
+    const _event_ = {
+        subject: "Let's go for lunch",
+        body: {
+            contentType: "HTML",
+            content: "Does noon work for you?"
+        },
+        start: {
+            dateTime: "2021-03-1T12:00:00",
+            timeZone: "Pacific Standard Time"
+        },
+        end: {
+            dateTime: "2021-03-1T14:00:00",
+            timeZone: "Pacific Standard Time"
+        },
+        location: {
+            displayName: "Harry's Bar"
+        },
+        attendees: [
+            {
+                emailAddress: {
+                    address: "samanthab@contoso.onmicrosoft.com",
+                    name: "Samantha Booth"
+                },
+                type: "required"
+            }
+        ],
+        allowNewTimeProposals: true,
+        transactionId: "7E163156-7762-4BEB-A1C6-729EA81755A7"
+    };
+
+
     const handleLoginMic = () => {
-        console.log('Calling get micro events')
-        getUserDetails();
+        // console.log('User details', getUserDetails());
+        graph
+        .getUserDetails()
+        .then(event => {
+            console.log('getUserCalendars: ', event)
+        }).catch(error => {
+            console.log(error)
+        });
+
+        // // console.log('User details', getUserDetails());
+        // graph.createEvent('law.you.test.lawyer@gmail.com', _event_).then(event => {
+        //     console.log('event created: ', event)
+        // }).catch(error => {
+        //     console.log('App -- handleLoginMic');
+        //     dispatchEvents({
+        //         type: 'ERROR',
+        //         payload: `Imposible crear evento`
+        //     })
+        // });
+
+        // // console.log('User details', getUserDetails());
+        // graph.getUserEvents('law.you.test@gmail.com').then(event => {
+        //     console.log('events after post: ', event)
+        // }).catch(error => {
+        //     console.log(error)
+        // });
+
+        // getEvents().then(event => {
+        //     console.log(event)
+        // }).catch(error => {
+        //     console.log(error)
+        // });
     }
 
 
