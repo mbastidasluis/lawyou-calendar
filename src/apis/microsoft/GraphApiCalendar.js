@@ -1,18 +1,24 @@
-import { Client } from "@microsoft/microsoft-graph-client";
-import { authProvider } from './Config';
+import { Client, ResponseType } from "@microsoft/microsoft-graph-client";
+import { MIN_TIME } from "../../utils/Constants";
+import { authProvider, msalApplication } from './Config';
 
 const options = {
     authProvider, // An instance created from previous step
 };
 const client = Client.initWithMiddleware(options);
 
+// authProvider.getAccessToken().then(at => { console.log(at) }).catch(at => { console.log(at) });
+
 const masterAccountId = 'law.you.test@gmail.com';
+// const masterAccountId = 'law.you.test.lawyer@gmail.com';
+
+// (() => { console.log(msalApplication.getAccount()); })();
 
 
 
 export const getUserDetails = async (userId = masterAccountId) => {
     try {
-        return await client.api(`/users`).get();
+        return await client.api(`/users/${userId}`).get();
     } catch (error) {
         console.log(error);
     }
@@ -58,12 +64,19 @@ export const getUserEvents = async (userId = masterAccountId) => {
 
 /**
  * Devuelve listado de todos los eventos un calendario compartido 
- * @param {string} sharerUserId Id del usuario que comparte el calendario
+ * @param {string} calendarId Id del calendario del cual se consultan los eventos
  * @returns {Promise}
  */
-export const getEventsFromSharedCalendar = async (sharerUserId) => {
+export const getEventsFromSharedCalendar = async (calendarId) => {
     try {
-        return await client.api(`/users/${sharerUserId}/calendar/events`).get();
+        return await client
+            .api(`/me/calendars/${calendarId}/events`)
+            // Select only data of interest
+            .select(['subject', 'body', 'start', 'end'])
+            // Filter by date & time
+            // .filter(`start/dateTime ge '${MIN_TIME.toISOString()}'`)
+            .header('Prefer', 'outlook.timezone="Europe/Madrid"')
+            .get();
     } catch (error) {
         console.log(error);
     }
@@ -83,6 +96,57 @@ export const createEvent = async (userId, event) => {
         return await client.api(`/users/${userId}/events`).post(event);
     } catch (error) {
         console.log('GraphApiCalendar -- createEvent');
+        console.log(error);
+    }
+}
+
+
+export const createSharedEvent = async (calendarId, event) => {
+    try {
+        return await client.api(`/me/calendars/${calendarId}/events`).post(event);
+    } catch (error) {
+        console.log('GraphApiCalendar -- createSaredEvent -- error');
+        console.log(error);
+    }
+}
+
+export const updateSharedEvent = async (calendarId, eventId, event) => {
+    try {
+        return await client
+            .api(`/me/calendars/${calendarId}/events/${eventId}`)
+            .update(event);
+    } catch (error) {
+        console.log('GraphApiCalendar -- createSaredEvent -- error');
+        console.log(error);
+    }
+}
+
+export const deleteSaredEvent = async (calendarId, eventId) => {
+    try {
+        return await client
+            .api(`/me/calendars/${calendarId}/events/${eventId}`)
+            .responseType(ResponseType.RAW)
+            .delete();
+    } catch (error) {
+        console.log('GraphApiCalendar -- createSaredEvent -- error');
+        console.log(error);
+    }
+}
+
+export const logout = async () => {
+    try {
+        msalApplication.logout(); //
+    } catch (error) {
+        console.log('GraphApiCalendar -- logout');
+        console.error(error);
+    }
+}
+
+export const getSharingInfo = async () => {
+    try {
+        return await client.api(`/users/${masterAccountId}/calendar/calendarPermissions`).get();
+    } catch (error) {
+        console.log('GraphApiCalendar -- logout');
         console.log(error);
     }
 }

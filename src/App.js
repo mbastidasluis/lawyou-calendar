@@ -4,18 +4,19 @@ import moment from 'moment';
 import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import API_CALENDAR from './apis/google/GoogleApiCalendar';
-import * as graph from './apis/microsoft/index';
+import ApiCalendar from './apis/ApiCalendar';
 import { Providers, ProviderState } from '@microsoft/mgt-element';
 
-import ApiCalendar from './apis/ApiCalendar';
 
 // Constantes útiles a lo largo del tiempo de ejecución
-import { DATE_FORMAT, TIME_FORMAT, MIN_TIME, MAX_TIME, STRING_NOW, CALENDAR_TAGS_ES } from './utils/Constants';
+import { DATE_FORMAT, TIME_FORMAT, MIN_TIME, MAX_TIME, STRING_NOW, CALENDAR_TAGS_ES }
+    from './utils/Constants';
 
 // Traductor de la información de fechas y horas mostradas en el calendario
 const localizer = momentLocalizer(moment);
 
 const eventsReducer = (state, action) => {
+    // console.log('eventsReducer', action);
     switch (action.type) {
         case 'WAIT':
             return { ...state, isLoading: true, isError: false };
@@ -28,7 +29,7 @@ const eventsReducer = (state, action) => {
         case 'LOGOUT':
             return { ...state, data: [], modalEvent: {}, isLoading: false, isError: false };
         case 'ACCOUNT_CHANGE':
-            return { ...state, data: [], modalEvent: {} };
+            return { ...state, data: [], modalEvent: {}, };
         case 'EVENTS_FETCH_SUCCESS':
             return { ...state, data: action.payload, isLoading: false, isError: false };
         case 'SINGLE_EVENT_MANAGEMENT':
@@ -40,14 +41,12 @@ const eventsReducer = (state, action) => {
         case 'MODAL_CLOSE':
             return { ...state, isLoading: false, modalIsVisible: false, modalEvent: {} };
         case 'CREATE_EVENT':
-            return { ...state, data: state.data.concat(action.payload) };
+            return { ...state, data: [...state.data, action.payload] };
         case 'UPDATE_EVENT':
-
             let eventIndex = state.data.findIndex(event => event.id === action.payload.id);
             let newEventsArray = [...state.data];
             newEventsArray[eventIndex] = action.payload;
             return { ...state, data: newEventsArray };
-
         case 'DELETE_EVENT':
             return { ...state, data: state.data.filter(event => action.payload.id !== event.id) };
         default:
@@ -55,36 +54,52 @@ const eventsReducer = (state, action) => {
     }
 };
 
+const abogados = [
+    {
+        id: 'law.you.test.lawyer@gmail.com',
+        nombre: 'ABC',
+        proveedor: 'google'
+    },
+    {
+        id: 'law.you.test.abogado@gmail.com',
+        nombre: 'DEF',
+        proveedor: 'google'
+    },
+    {
+        id: 'AQMkADAwATM3ZmYAZS0zYTJkLWQ2ZGQALTAwAi0wMAoARgAAA1SvgvTQIT9Bt-tUQS0SCCAHAP5kivdQvmZHi6aK96ozddIAAAIBBgAAAP5kivdQvmZHi6aK96ozddIAAAIOIAAAAA==',
+        nombre: 'GHI',
+        proveedor: 'outlook'
+    },
+]
+
 const App = () => {
 
     // Instancia de la API de calendario
     const api = API_CALENDAR;
-    // const _api = GRAPH;
+    const _api = new ApiCalendar();
 
-
-
-    const [calendarId, setCalendarId] = useState(api.calendar);
+    const [agenda, setAgenda] = useState({});
 
     const [events, dispatchEvents] = useReducer(
         eventsReducer,
         // Estado inicial de variables internas
-        { data: [], modalEvent: {}, isLoading: false, isError: false, errorMessage: '', modalIsVisible: false }
+        { data: [], modalEvent: {}, lawyer: {}, isLoading: false, isError: false, errorMessage: '', modalIsVisible: false }
     );
 
     useEffect(() => {
-        setCalendarId(api.calendar);
-    }, [api.calendar]);
+        if (agenda.id) { handleGetEvents(); }
+    }, [agenda]);
 
-    // Gestión de inicio de sesión - usado en pruebas
-    const handleLogin = async () => {
-        return await api.handleAuthClick();
-    }
+    // // Gestión de inicio de sesión - usado en pruebas
+    // const handleLogin = async () => {
+    //     return await api.handleAuthClick();
+    // }
 
     // Gestión de cierre de sesión
     const handleLogout = async () => {
         dispatchEvents({ type: 'WAIT' });
         try {
-            await api.handleSignoutClick();
+            await _api.logout();
             dispatchEvents({ type: 'LOGOUT' });
         } catch (err) {
             alert(err);
@@ -119,65 +134,20 @@ const App = () => {
     ////////MICROSOFT/////////////////////////
 
 
-    // Gestión de múltiples calendarios con uns cuenta "Maestra"
-    const handleCalendarChange = async (newCalendarId) => {
+    const handleCalendarChange = async (newAgenda) => {
+        // Los datos de la agenda son pasados como String
+        let _agenda = JSON.parse(newAgenda);
+
+        // Verifica que se seleccione una cuenta
+        if (!_agenda.id) { return; }
+
         // Al cambiar la cuenta se restablecen los valores del calendario por defecto (vacío)
         dispatchEvents({ type: 'ACCOUNT_CHANGE' });
 
-        // Verifica que se seleccione una cuenta válida
-        if (newCalendarId === 'none') { return; }
-
-        // Se cambia el id del calendario (correo gmail) en los valores internos de la API
-        api.setCalendar(newCalendarId);
-
-        // Se muestra la pantalla de espera
-        dispatchEvents({ type: 'WAIT' });
-
-        // Si no se ha autenticado se realiza el proceso inicialmente
-        if (!api.sign) {
-            try {
-                api.handleAuthClick().then(
-                    () => {
-                        handleGetEvents();
-                    }, (e) => {
-                        console.log(e.error);
-                        api.handleSignoutClick();
-                        dispatchEvents({
-                            type: 'ERROR',
-                            payload: 'Debe autenticarse para poder gestionar la agenda del abogado.'
-                        })
-                    });
-            } catch (e) {
-                console.log(e.error);
-                api.handleSignoutClick();
-                dispatchEvents({
-                    type: 'ERROR',
-                    payload: 'Imposible iniciar sesión. Verifique e intente nuevamente'
-                });
-            }
-        } else {
-            // Se cargan los eventos asociados a la cuenta seleccionada
-            handleGetEvents();
-        }
+        // Se actualizan los datos de la agenda a administrar
+        setAgenda(_agenda);
     }
 
-    // Listado de calendarios suscritos por la cuenta maestra 
-    // Sólo muestra calendarios visibles en en la página de Google Calendar
-    // Usado en pruebas
-    const handleGetCalendarList = async () => {
-        console.log('handleGetCalendarList');
-        try {
-            let response = await api.listSharedCalendars();
-            if (response.status === 200) {
-                let { items } = response.result;
-                items.map(i => {
-                    console.log(i);
-                })
-            }
-        } catch (err) {
-            alert(err);
-        }
-    }
 
 
     // Gestión de vista del formulario de edición de citas
@@ -185,7 +155,8 @@ const App = () => {
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
 
-    // Gestión de selección de celdas del calendario - Prepara los datos para mostrar en el formulario de edición
+    // Gestión de selección de celdas del calendario.
+    // Prepara los datos para mostrar en el formulario de edición
     const handleEventSelection = (event) => {
 
         const START_DATE = moment(event.start);
@@ -195,7 +166,7 @@ const App = () => {
             type: 'SINGLE_EVENT_MANAGEMENT',
             payload: {
                 ...event,
-                summary: event.id ? event.summary : 'Nuevo Evento',
+                title: event.id ? event.title : 'Nuevo Evento',
                 start_date: START_DATE.format(DATE_FORMAT),
                 end_date: END_DATE.format(DATE_FORMAT),
                 start_time: START_DATE.format(TIME_FORMAT),
@@ -206,53 +177,30 @@ const App = () => {
     };
 
     // Gestión de consulta de eventos del calendario
-    const handleGetEvents = () => {
+    const handleGetEvents = async () => {
         dispatchEvents({ type: 'WAIT' });
+        // Los datos del abogado son pasados como String
 
-        // El número representa a cantidad máxima de resultados deseados
-        api.listUpcomingEvents(10)
-            .then(response => {
-                let upcomingEvents = response.result.items;
+        let eventos;
 
-                // Si existen eventos agendados
-                if (upcomingEvents.length > 0) {
-
-                    let single = {}, all = [];
-                    upcomingEvents.map(upcomingEvent => {
-                        // Si el evento es de tipo allDay el tipo de dato de Inicio y fin será Date y no Datetime
-                        // Para el calendario es necesario pasar estos valores como Date
-                        let start = upcomingEvent.start.dateTime ? new Date(upcomingEvent.start.dateTime) : upcomingEvent.start.date;
-                        let end = upcomingEvent.end.dateTime ? new Date(upcomingEvent.end.dateTime) : upcomingEvent.end.date;
-                        single = {
-                            ...upcomingEvent,
-                            start: start,
-                            start_time: moment(start).format('MM:ss'),
-                            end: end,
-                            end_time: moment(end).format('MM:ss'),
-                            // allDay: false
-                        };
-                        // console.log("SINGLE");
-                        // console.log(single);
-                        all.push(single);
-                    });
-                    // console.log("ALL");
-                    // console.log(all);
-                    // Se cargan los datos al calendario y se desactiva la pantalla de espera
-                    dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: all });
-                } else {
-                    // Se desactiva la pantalla de espera y se pasa un arreglo vacío al calendario
-                    dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: [] });
-                }
-            }).catch(e => {
-                if (e.status === 404) {
-                    dispatchEvents({
-                        type: 'ERROR',
-                        payload: 'Imposible acceder al calendario. Verifique que el propietario haya otorgado su autorización de acceso.'
-                    })
-                } else {
-                    dispatchEvents({ type: 'ERROR', payload: 'Imposible iniciar sesión' });
-                }
+        // Si no se ha autenticado se realiza el proceso inicialmente
+        try {
+            eventos = await _api.getEvents(agenda.id, agenda.proveedor);
+            // console.log("eventos", eventos);
+            if (eventos) {
+                dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: eventos });
+            }
+            else {
+                dispatchEvents({ type: 'EVENTS_FETCH_SUCCESS', payload: [] });
+            }
+        } catch (e) {
+            // console.log(e.error);
+            dispatchEvents({
+                type: 'ERROR',
+                payload: 'Imposible consultar eventos. Verifique e intente de nuevo.'
             });
+        }
+
     }
 
     // Gestión de los valores temporales usados para crear/actualizar evento
@@ -261,8 +209,8 @@ const App = () => {
         let { modalEvent } = events;
 
         switch (e.target.id) {
-            case 'summary':
-                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, summary: e.target.value } });
+            case 'title':
+                dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, title: e.target.value } });
                 break;
             case 'init_date':
                 dispatchEvents({ type: 'UPDATE_MODAL_EVENT', payload: { ...modalEvent, start_date: (e.target.value) } });
@@ -286,21 +234,24 @@ const App = () => {
         dispatchEvents({ type: 'WAIT' });
 
         try {
-            let response = await api.deleteEvent(events.modalEvent.id);
-
+            let response = await _api.deleteEvent(agenda.proveedor, agenda.id, events.modalEvent.id);
             if (response.status === 204) {
-                dispatchEvents({ type: 'DELETE_EVENT', payload: events.modalEvent });
+                dispatchEvents({
+                    type: 'DELETE_EVENT',
+                    payload: events.modalEvent
+                });
             }
         } catch (error) {
             dispatchEvents({
                 type: 'ERROR',
-                payload: 'Imposible eliminar cita. Verifique que el propietario haya otorgado los permisos correspondientes.'
+                payload:
+                    `Imposible eliminar cita.
+                     Verifique que el propietario haya otorgado los permisos correspondientes.`
             });
         }
 
         dispatchEvents({ type: 'MODAL_CLOSE' });
     }
-
 
     // Gestión de edición de carga de eventos nuevos/antigüos
     const handleEventSave = async () => {
@@ -320,71 +271,27 @@ const App = () => {
         }
 
         try {
+            // console.log('handleEventSave -- agenda', agenda);
+            let result = await _api.saveEvent(agenda.id, agenda.proveedor, modalEvent);
 
-            // Si el evento gestionado tiene ID entonces se trata de una edición de un evento anterior 
-            if (modalEvent.id) {
-                let response = await api.updateEvent({
-                    ...modalEvent,
-                    // start: new Date(modalEvent.start).toISOString(),
-                    // end: new Date(modalEvent.end).toISOString()
-                    start: {
-                        dateTime: moment(modalEvent.start_date + ' ' + modalEvent.start_time).toISOString(),
-                        timeZone: 'Europe/Madrid',
-                    },
-                    end: {
-                        dateTime: moment(modalEvent.end_date + ' ' + modalEvent.end_time).toISOString(),
-                        timeZone: 'Europe/Madrid',
-                    },
-                }, modalEvent.id);
-                // console.log('UPDATE_EVENT');
-                // console.log(response.status);
+            // Existen dos posibles valores para la variable 'mode': 'update'|'create'. 
+            // Si ninguno de estos valores retorna en el resultado se asume un error en el proceso
+            let modType = result.mode === 'update'
+                ? 'UPDATE_EVENT'
+                : result.mode === 'create'
+                    ? 'CREATE_EVENT'
+                    : 'ERROR';
 
-                if (response.status === 200) {
-                    let { result } = response;
-
-                    dispatchEvents({
-                        type: 'UPDATE_EVENT', payload:
-                        {
-                            ...result,
-                            start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
-                            end: result.end.dateTime ? new Date(result.end.dateTime) : result.end.date,
-                        }
-                    });
-                }
+            if (modType === 'ERROR') {
+                dispatchEvents({
+                    type: 'ERROR',
+                    payload: 'Imposible modificar agenda. Verifique los valores suminstrados e intente de nuevo.'
+                });
             } else {
-                // Creación de un evento nuevo
-                let response = await api.createEvent(
-                    {
-                        ...modalEvent,
-                        // start: new Date(modalEvent.start).toISOString(),
-                        // end: new Date(modalEvent.end).toISOString()
-                        start: {
-                            dateTime: moment(modalEvent.start_date + ' ' + modalEvent.start_time).toISOString(),
-                            timeZone: 'Europe/Madrid',
-                        },
-                        end: {
-                            dateTime: moment(modalEvent.end_date + ' ' + modalEvent.end_time).toISOString(),
-                            timeZone: 'Europe/Madrid',
-                        },
-                    });
-
-                if (response.status === 200) {
-                    let { result } = response;
-                    dispatchEvents({
-                        type: 'CREATE_EVENT',
-                        payload:
-                        {
-                            ...result,
-                            start: result.start.dateTime ? new Date(result.start.dateTime) : result.start.date,
-                            end: result.end.dateTime ? new Date(result.end.dateTime) : result.end.date,
-                        }
-                    });
-                } else if (response.status === 403) {
-                    dispatchEvents({
-                        type: 'ERROR',
-                        payload: 'No posee autorización para añadir nuevas citas. Por favor, solicite los permisos correspondientes al titular de esta agenda.'
-                    });
-                }
+                dispatchEvents({
+                    type: modType,
+                    payload: result
+                });
             }
         } catch (error) {
             dispatchEvents({
@@ -399,72 +306,6 @@ const App = () => {
         dispatchEvents({ type: 'ERROR_CLOSE' });
     }
 
-    const _event_ = {
-        subject: "Let's go for lunch",
-        body: {
-            contentType: "HTML",
-            content: "Does noon work for you?"
-        },
-        start: {
-            dateTime: "2021-03-1T12:00:00",
-            timeZone: "Pacific Standard Time"
-        },
-        end: {
-            dateTime: "2021-03-1T14:00:00",
-            timeZone: "Pacific Standard Time"
-        },
-        location: {
-            displayName: "Harry's Bar"
-        },
-        attendees: [
-            {
-                emailAddress: {
-                    address: "samanthab@contoso.onmicrosoft.com",
-                    name: "Samantha Booth"
-                },
-                type: "required"
-            }
-        ],
-        allowNewTimeProposals: true,
-        transactionId: "7E163156-7762-4BEB-A1C6-729EA81755A7"
-    };
-
-
-    const handleLoginMic = () => {
-        // console.log('User details', getUserDetails());
-        graph
-        .getUserDetails()
-        .then(event => {
-            console.log('getUserCalendars: ', event)
-        }).catch(error => {
-            console.log(error)
-        });
-
-        // // console.log('User details', getUserDetails());
-        // graph.createEvent('law.you.test.lawyer@gmail.com', _event_).then(event => {
-        //     console.log('event created: ', event)
-        // }).catch(error => {
-        //     console.log('App -- handleLoginMic');
-        //     dispatchEvents({
-        //         type: 'ERROR',
-        //         payload: `Imposible crear evento`
-        //     })
-        // });
-
-        // // console.log('User details', getUserDetails());
-        // graph.getUserEvents('law.you.test@gmail.com').then(event => {
-        //     console.log('events after post: ', event)
-        // }).catch(error => {
-        //     console.log(error)
-        // });
-
-        // getEvents().then(event => {
-        //     console.log(event)
-        // }).catch(error => {
-        //     console.log(error)
-        // });
-    }
-
 
     return (
         <>
@@ -477,17 +318,15 @@ const App = () => {
                             <p className="select">
                                 <select onChange={e => handleCalendarChange(e.target.value)}>
                                     <option value="none">Elige una agenda a gestionar</option>
-                                    <option value="law.you.test.lawyer@gmail.com">Abogado 2</option>
-                                    <option value="law.you.test.abogado@gmail.com">Abogado 3</option>
+                                    {abogados.map(abogado =>
+                                        <option key={abogado.id} value={JSON.stringify(abogado)}>
+                                            {abogado.nombre} - {abogado.proveedor}
+                                        </option>
+                                    )}
                                 </select>
                             </p>
                         </div>
-                        <div className="field">
-                            {/* Selector de prueba - gestión de múltiples cuentas */}
-                            <p className="button" onClick={handleLoginMic}>
-                                MICROSOFT LOGIN
-                            </p>
-                        </div>
+
 
                         {/* Se ocultan estos botones cuando el id del calendario es igual a 'Primary' - aún no se ha seleccionado cuenta de un socio */}
                         {/* Es decir que estamos hablando de la cuenta maestra - para esta cuenta no gestionamos eventos */}
@@ -495,12 +334,18 @@ const App = () => {
                             <>
                                 <div className="field">
                                     <p className="control is-expanded">
-                                        <Button classes={['button', 'is-info']} onClickHandler={handleGetEvents} tag="Actualizar" />
+                                        <Button
+                                            classes={['button', 'is-info']}
+                                            onClickHandler={handleGetEvents}
+                                            tag="Actualizar" />
                                     </p>
                                 </div>
                                 <div className="field">
                                     <p className="control is-expanded">
-                                        <Button classes={['button', 'is-danger']} onClickHandler={handleLogout} tag="Cerrar" />
+                                        <Button
+                                            classes={['button', 'is-danger']}
+                                            onClickHandler={handleLogout}
+                                            tag="Cerrar" />
                                     </p>
                                 </div>
                             </>
@@ -518,7 +363,7 @@ const App = () => {
                                 selectable                                                  // Habilita la selección de las celdas del calendario
                                 min={MIN_TIME}                                              // Hora mínima habilitada para carga de eventos - por defecto las 8H
                                 max={MAX_TIME}                                              // Hora máxima habilitada para carga de eventos - por defecto las 20H
-                                titleAccessor="summary"                                     // Variable que guarda el título del evento
+                                // titleAccessor="summary"                                  // Variable que guarda el título del evento
                                 localizer={localizer}                                       // Traductor de fechas mostradas en el calendario
                                 events={events.data}                                        // Eventos
                                 startAccessor="start"                                       // Variable que guarda el inicio del evento
@@ -580,7 +425,7 @@ const App = () => {
                                 <div className="field-body">
                                     <div className="field">
                                         <p className="control is-expanded has-icons-left">
-                                            <input id="summary" className="input" type="text" placeholder="Text input" value={events.modalEvent.summary} onChange={e => handleInputChange(e)} />
+                                            <input id="title" className="input" type="text" placeholder="Text input" value={events.modalEvent.title} onChange={e => handleInputChange(e)} />
                                         </p>
                                     </div>
                                 </div>

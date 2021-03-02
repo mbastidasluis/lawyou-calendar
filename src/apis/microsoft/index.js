@@ -1,3 +1,3 @@
-import { getEventsFromSharedCalendar, getUserDetails, getUserCalendarPermissions, gePropertiesOfSharedCalendar, getUserCalendars, getUserEvents, getPermissionsGranted, createEvent } from './GraphApiCalendar';
+import { deleteSaredEvent, getEventsFromSharedCalendar, getSharingInfo, getUserDetails, getUserCalendarPermissions, gePropertiesOfSharedCalendar, getUserCalendars, getUserEvents, getPermissionsGranted, createEvent, createSharedEvent, logout, updateSharedEvent } from './GraphApiCalendar';
 
-export { getEventsFromSharedCalendar, getUserDetails, getUserCalendarPermissions, gePropertiesOfSharedCalendar, getUserCalendars, getUserEvents, getPermissionsGranted, createEvent };
+export { deleteSaredEvent, getEventsFromSharedCalendar, getSharingInfo, getUserDetails, getUserCalendarPermissions, gePropertiesOfSharedCalendar, getUserCalendars, getUserEvents, getPermissionsGranted, createEvent, createSharedEvent, logout, updateSharedEvent };
