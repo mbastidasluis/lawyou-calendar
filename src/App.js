@@ -5,7 +5,6 @@ import 'moment/locale/es';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import API_CALENDAR from './apis/google/GoogleApiCalendar';
 import ApiCalendar from './apis/ApiCalendar';
-import { Providers, ProviderState } from '@microsoft/mgt-element';
 
 
 // Constantes útiles a lo largo del tiempo de ejecución
@@ -106,32 +105,32 @@ const App = () => {
         }
     }
 
-    ////////CUSTOM HOOK/////////////////////////
+    // ////////CUSTOM HOOK/////////////////////////
 
-    const useIsSignedIn = () => {
-        const [isSignedIn, setIsSignedIn] = useState(false);
+    // const useIsSignedIn = () => {
+    //     const [isSignedIn, setIsSignedIn] = useState(false);
 
-        useEffect(() => {
-            const updateState = () => {
-                const provider = Providers.globalProvider;
-                setIsSignedIn(provider && provider.state === ProviderState.SignedIn);
-            };
+    //     useEffect(() => {
+    //         const updateState = () => {
+    //             const provider = Providers.globalProvider;
+    //             setIsSignedIn(provider && provider.state === ProviderState.SignedIn);
+    //         };
 
-            Providers.onProviderUpdated(updateState);
-            updateState();
+    //         Providers.onProviderUpdated(updateState);
+    //         updateState();
 
-            return () => {
-                Providers.removeProviderUpdatedListener(updateState);
-            }
-        }, []);
+    //         return () => {
+    //             Providers.removeProviderUpdatedListener(updateState);
+    //         }
+    //     }, []);
 
-        return [isSignedIn];
-    }
+    //     return [isSignedIn];
+    // }
 
-    const [isSignedIn] = useIsSignedIn();
+    // const [isSignedIn] = useIsSignedIn();
 
 
-    ////////MICROSOFT/////////////////////////
+    // ////////MICROSOFT/////////////////////////
 
 
     const handleCalendarChange = async (newAgenda) => {
@@ -147,7 +146,6 @@ const App = () => {
         // Se actualizan los datos de la agenda a administrar
         setAgenda(_agenda);
     }
-
 
 
     // Gestión de vista del formulario de edición de citas
@@ -184,6 +182,12 @@ const App = () => {
         let eventos;
 
         // Si no se ha autenticado se realiza el proceso inicialmente
+        // try {
+        //     await _api.signIn();
+        // } catch (error) {
+        //     console.log('App -- handleGetEvents -- error', error);
+        // }
+
         try {
             eventos = await _api.getEvents(agenda.id, agenda.proveedor);
             // console.log("eventos", eventos);
@@ -271,7 +275,6 @@ const App = () => {
         }
 
         try {
-            // console.log('handleEventSave -- agenda', agenda);
             let result = await _api.saveEvent(agenda.id, agenda.proveedor, modalEvent);
 
             // Existen dos posibles valores para la variable 'mode': 'update'|'create'. 

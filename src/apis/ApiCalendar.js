@@ -13,7 +13,6 @@ import google from './google/GoogleApiCalendar';
 
 class ApiCalendar {
 
-
     async getUserDetails() {
         let events = await this.graph.getUserDetails();
         console.log(events);
@@ -173,15 +172,16 @@ class ApiCalendar {
 
     async saveGraphEvent(calendarId, event) {
         let response;
+
         event = {
             ...event,
             subject: event.title,
             start: {
-                dateTime: moment(event.start_date + ' ' + event.start_time).toISOString(),
+                dateTime: event.start_date + ' ' + event.start_time,
                 timeZone: 'Europe/Madrid',
             },
             end: {
-                dateTime: moment(event.end_date + ' ' + event.end_time).toISOString(),
+                dateTime: event.end_date + ' ' + event.end_time,
                 timeZone: 'Europe/Madrid',
             },
         };
@@ -275,13 +275,14 @@ class ApiCalendar {
     }
 
     /**
-     * Método usado para crear un nuevo objeto eliminando propiedades que generar
-     * error en el servidor al ser procesadas. Cualquier propiedad incluida abajo
-     * será obviada del nuevobjeto creado
-     * @param {any} eventObject Variable objeto que representa un evento
+     * Método usado para despoja al objeto evento que se enviará al servidos de 
+     * otlook de las propiedades que generar conflivto. Cualquier propiedad incluida
+     * abajo será obviada del nuevobjeto creado.
+     * @param {any} eventObject Variable objeto que representa un evento de Outlook
      */
     strip(eventObject) {
-        const { slots, resourceId, action, box, title, start_date, end_date, start_time, end_time, ...newEventObject } = eventObject;
+        const { slots, resourceId, action, bounds, box, title, start_date, end_date, start_time, end_time, mode, ...newEventObject } = eventObject;
+        // console.log('Stripped object', newEventObject);
         return newEventObject;
     }
 

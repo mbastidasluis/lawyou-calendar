@@ -16,6 +16,31 @@ const masterAccountId = 'law.you.test@gmail.com';
 
 
 
+export const getAccount = () => {
+    try {
+
+        console.log('GraphApiCalendar -- getAccount --  msalApplication.getAccountState()', msalApplication.getAccountState());
+        msalApplication.getAccount();
+    } catch (error) {
+        console.log(error);
+    }
+}
+export const getSupportedTimeZones = async () => {
+    try {
+        return await client.api('/me/supportedTimeZones').get();
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+export const logIn = async () => {
+    try {
+        msalApplication.loginPopup();
+    } catch (error) {
+        console.log(error);
+    }
+}
+
 export const getUserDetails = async (userId = masterAccountId) => {
     try {
         return await client.api(`/users/${userId}`).get();
