@@ -18,8 +18,6 @@ const masterAccountId = 'law.you.test@gmail.com';
 
 export const getAccount = () => {
     try {
-
-        console.log('GraphApiCalendar -- getAccount --  msalApplication.getAccountState()', msalApplication.getAccountState());
         msalApplication.getAccount();
     } catch (error) {
         console.log(error);
